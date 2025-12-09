@@ -1,0 +1,35 @@
+apiVersion: v2
+name: hyperfleet
+description: HyperFleet Platform - Umbrella chart for deploying the complete HyperFleet stack
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+maintainers:
+  - name: HyperFleet Team
+    email: hyperfleet-team@redhat.com
+keywords:
+  - hyperfleet
+  - kubernetes
+  - cluster-management
+  - multi-cloud
+home: https://github.com/openshift-hyperfleet/hyperfleet-chart
+
+dependencies:
+  # HyperFleet API - Cluster lifecycle management REST API
+  - name: hyperfleet-api
+    version: "1.0.0"
+    repository: "file://../hyperfleet-api/charts"
+    condition: hyperfleet-api.enabled
+
+  # HyperFleet Adapter - Event-driven adapter for cluster provisioning
+  - name: hyperfleet-adapter
+    version: "1.0.0"
+    repository: "file://../hyperfleet-adapter/charts"
+    condition: hyperfleet-adapter.enabled
+
+  # HyperFleet Sentinel - Resource polling and event publishing
+  - name: sentinel
+    version: "0.1.0"
+    repository: "file://../hyperfleet-sentinel/deployments/helm/sentinel"
+    condition: sentinel.enabled
+

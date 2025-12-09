@@ -1,0 +1,69 @@
+# Development values for HyperFleet umbrella chart
+# Copy this file to values-dev.yaml and customize for your environment
+#
+# Usage:
+#   cp values-dev.yaml.example values-dev.yaml
+#   # Edit values-dev.yaml with your image tags
+#   helm install hyperfleet . -f values-dev.yaml --namespace hyperfleet-system --create-namespace
+
+# =============================================================================
+# API Configuration
+# =============================================================================
+hyperfleet-api:
+  enabled: true
+  image:
+    registry: quay.io/YOUR_QUAY_USERNAME
+    repository: hyperfleet-api
+    tag: "dev-YOUR_API_GIT_SHA"
+  database:
+    postgresql:
+      enabled: true
+      password: "dev-password-change-me"
+    external:
+      enabled: false
+
+# =============================================================================
+# Adapter Configuration
+# =============================================================================
+# NOTE: Adapter is disabled by default because it requires custom AdapterConfig
+# (adapter.yaml) specific to your cloud provider and deployment scenario.
+# To enable: set enabled: true and provide config.adapterYaml
+hyperfleet-adapter:
+  enabled: false
+  image:
+    registry: quay.io/YOUR_QUAY_USERNAME
+    repository: hyperfleet-adapter
+    tag: "dev-YOUR_ADAPTER_GIT_SHA"
+  broker:
+    create: true
+    type: rabbitmq
+    subscriptionId: "hyperfleet-adapter-queue"
+    env:
+      BROKER_RABBITMQ_URL: "amqp://hyperfleet:hyperfleet-dev-password@hyperfleet-rabbitmq:5672/"
+
+# =============================================================================
+# Sentinel Configuration
+# =============================================================================
+# Note: Sentinel uses full repository path (no separate registry field)
+sentinel:
+  enabled: true
+  image:
+    repository: quay.io/YOUR_QUAY_USERNAME/sentinel
+    tag: "dev-YOUR_SENTINEL_GIT_SHA"
+  broker:
+    type: rabbitmq
+    topic: "hyperfleet-clusters"
+    rabbitmq:
+      url: "amqp://hyperfleet:hyperfleet-dev-password@hyperfleet-rabbitmq:5672/"
+
+# =============================================================================
+# RabbitMQ Configuration
+# =============================================================================
+rabbitmq:
+  enabled: true
+  image:
+    repository: rabbitmq
+    tag: 3-management
+  auth:
+    username: hyperfleet
+    password: hyperfleet-dev-password

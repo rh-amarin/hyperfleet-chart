@@ -1,0 +1,117 @@
+# Example values for HyperFleet with Google Pub/Sub
+# Copy this file to values-pubsub.yaml and customize for your environment
+#
+# Usage:
+#   cp values-pubsub.yaml.example values-pubsub.yaml
+#   # Edit values-pubsub.yaml with your GCP project ID and service accounts
+#   helm install hyperfleet . -f values-pubsub.yaml --namespace hyperfleet-system --create-namespace
+#
+# Prerequisites:
+#   1. GKE cluster with Workload Identity enabled
+#   2. GCP service accounts created with appropriate IAM roles:
+#      - sentinel@PROJECT.iam.gserviceaccount.com (roles/pubsub.publisher)
+#      - adapter@PROJECT.iam.gserviceaccount.com (roles/pubsub.subscriber)
+#   3. Workload Identity bindings configured between KSA and GSA
+#
+# For development with auto-create:
+#   Set createTopicIfMissing: true and createSubscriptionIfMissing: true
+#   Service account needs roles/pubsub.editor
+#
+# For production with Terraform-provisioned resources:
+#   Set createTopicIfMissing: false and createSubscriptionIfMissing: false
+
+# =============================================================================
+# Global Broker Configuration
+# =============================================================================
+global:
+  broker:
+    type: googlepubsub
+    googlepubsub:
+      # REQUIRED: Set your GCP project ID
+      projectId: "your-gcp-project-id"
+      # Auto-create for dev (set false for production)
+      createTopicIfMissing: true
+      createSubscriptionIfMissing: true
+
+# =============================================================================
+# HyperFleet API Configuration
+# =============================================================================
+hyperfleet-api:
+  enabled: true
+  replicaCount: 1
+  image:
+    registry: quay.io/openshift-hyperfleet
+    repository: hyperfleet-api
+    tag: latest
+  database:
+    postgresql:
+      enabled: true
+    external:
+      enabled: false
+
+# =============================================================================
+# HyperFleet Adapter Configuration
+# =============================================================================
+hyperfleet-adapter:
+  enabled: true
+  replicaCount: 1
+  image:
+    registry: quay.io/openshift-hyperfleet
+    repository: hyperfleet-adapter
+    tag: latest
+  # ServiceAccount with Workload Identity annotation
+  serviceAccount:
+    create: true
+    annotations:
+      # REQUIRED: Set your adapter GCP service account
+      iam.gke.io/gcp-service-account: adapter@your-gcp-project-id.iam.gserviceaccount.com
+  # Broker configuration for consuming events
+  broker:
+    create: true
+    type: googlepubsub
+    # Subscription ID for adapter to consume from
+    subscriptionId: "hyperfleet-adapter-subscription"
+    # Topic to subscribe to (matches sentinel topic)
+    topic: "hyperfleet-clusters"
+    googlepubsub:
+      # REQUIRED: Set your GCP project ID
+      projectId: "your-gcp-project-id"
+      ackDeadlineSeconds: 60
+      maxOutstandingMessages: 1000
+      numGoroutines: 10
+      createSubscriptionIfMissing: true
+
+# =============================================================================
+# HyperFleet Sentinel Configuration
+# =============================================================================
+sentinel:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: quay.io/openshift-hyperfleet/sentinel
+    tag: latest
+  # ServiceAccount with Workload Identity annotation
+  serviceAccount:
+    create: true
+    annotations:
+      # REQUIRED: Set your sentinel GCP service account
+      iam.gke.io/gcp-service-account: sentinel@your-gcp-project-id.iam.gserviceaccount.com
+  # Broker configuration for publishing events
+  broker:
+    type: googlepubsub
+    # Topic name for publishing events
+    topic: "hyperfleet-clusters"
+    googlepubsub:
+      # REQUIRED: Set your GCP project ID
+      projectId: "your-gcp-project-id"
+      ackDeadlineSeconds: 60
+      maxOutstandingMessages: 1000
+      numGoroutines: 10
+      createTopicIfMissing: true
+
+# =============================================================================
+# RabbitMQ Configuration
+# =============================================================================
+# Disable RabbitMQ when using Pub/Sub
+rabbitmq:
+  enabled: false
