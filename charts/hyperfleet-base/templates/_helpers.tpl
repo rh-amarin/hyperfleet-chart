@@ -53,18 +53,6 @@ Usage: {{ include "hyperfleet-base.imageRegistry" (dict "global" .Values.global 
 {{- end }}
 
 {{/*
-Global image tag helper - returns global tag if set, otherwise component tag
-Usage: {{ include "hyperfleet-base.imageTag" (dict "global" .Values.global "local" .Values.component.image.tag) }}
-*/}}
-{{- define "hyperfleet-base.imageTag" -}}
-{{- if and .global .global.image .global.image.tag }}
-{{- .global.image.tag }}
-{{- else }}
-{{- .local }}
-{{- end }}
-{{- end }}
-
-{{/*
 RabbitMQ URL helper - generates URL from in-cluster RabbitMQ or uses provided URL
 */}}
 {{- define "hyperfleet-base.rabbitmqUrl" -}}

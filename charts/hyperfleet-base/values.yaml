@@ -12,10 +12,10 @@
 # Global Configuration
 # =============================================================================
 global:
-  # Shared image settings - override per-component if needed
+  # Shared image registry - override per-component if needed
   image:
     registry: ""  # e.g., "quay.io/croche" for custom builds
-    tag: ""       # e.g., "dev-abc123" for custom builds
+    # Note: No global tag - each component has independent release cycles
 
   # Broker abstraction layer
   # Cloud overlays can override these defaults

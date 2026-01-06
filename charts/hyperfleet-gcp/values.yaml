@@ -18,8 +18,7 @@
 base:
   global:
     image:
-      registry: ""
-      tag: ""
+      registry: ""  # e.g., "quay.io/croche" for custom builds
 
     broker:
       # Default to Pub/Sub for GCP production
