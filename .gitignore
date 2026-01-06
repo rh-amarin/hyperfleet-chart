@@ -10,6 +10,3 @@ charts/*/Chart.lock
 # Helm dependency packages (downloaded charts stored in each chart's charts/ dir)
 charts/*/charts/
 *.tgz
-
-# Work in progress notes
-WORK_IN_PROGRESS.md
