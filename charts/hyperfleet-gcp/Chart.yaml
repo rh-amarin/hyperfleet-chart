@@ -1,0 +1,33 @@
+apiVersion: v2
+name: hyperfleet-gcp
+description: HyperFleet for Google Cloud Platform - GCP-specific adapters and configuration
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+maintainers:
+  - name: HyperFleet Team
+    email: hyperfleet-team@redhat.com
+
+keywords:
+  - hyperfleet
+  - gcp
+  - gke
+  - kubernetes
+  - cluster-management
+  - google-cloud
+
+home: https://github.com/openshift-hyperfleet/hyperfleet-chart
+
+dependencies:
+  # Base chart provides core platform (API, Sentinel, Landing Zone)
+  - name: hyperfleet-base
+    version: "1.0.0"
+    repository: "file://../hyperfleet-base"
+    alias: base
+
+  # GCP-specific validation adapter
+  - name: validation-gcp
+    version: "1.0.0"
+    repository: "git+https://github.com/openshift-hyperfleet/adapter-validation-gcp@charts?ref=main"
+    condition: validation-gcp.enabled

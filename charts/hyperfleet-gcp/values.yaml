@@ -1,0 +1,105 @@
+# HyperFleet GCP Overlay - Default Values
+#
+# This chart deploys HyperFleet on Google Cloud Platform with:
+# - Base platform (API, Sentinel, Landing Zone) from hyperfleet-base
+# - GCP-specific validation adapter
+# - Google Pub/Sub as default broker
+# - Workload Identity support
+#
+# Usage:
+#   helm install hyperfleet . \
+#     --set base.global.broker.googlepubsub.projectId=YOUR_PROJECT \
+#     -n hyperfleet-system --create-namespace
+
+# =============================================================================
+# Base Chart Overrides
+# =============================================================================
+# Override settings from hyperfleet-base
+base:
+  global:
+    image:
+      registry: ""
+      tag: ""
+
+    broker:
+      # Default to Pub/Sub for GCP production
+      type: googlepubsub
+
+      rabbitmq:
+        enabled: false
+
+      googlepubsub:
+        enabled: true
+        # REQUIRED: Set your GCP project ID
+        projectId: ""
+        # Set to true for development if topics/subscriptions don't exist
+        createTopicIfMissing: false
+        createSubscriptionIfMissing: false
+
+  # API configuration
+  hyperfleet-api:
+    enabled: true
+
+  # Sentinel configuration with GCP defaults
+  sentinel:
+    enabled: true
+    serviceAccount:
+      create: true
+      annotations: {}
+      # Set for Workload Identity:
+      # iam.gke.io/gcp-service-account: sentinel@PROJECT.iam.gserviceaccount.com
+    broker:
+      type: googlepubsub
+      topic: ""  # Set your topic name
+      googlepubsub:
+        projectId: ""
+
+  # Landing Zone with GCP defaults
+  landing-zone:
+    enabled: true
+    serviceAccount:
+      create: true
+      annotations: {}
+      # Set for Workload Identity:
+      # iam.gke.io/gcp-service-account: landing-zone@PROJECT.iam.gserviceaccount.com
+    broker:
+      type: googlepubsub
+      googlepubsub:
+        projectId: ""
+        topic: ""
+        subscription: ""
+        deadLetterTopic: ""
+
+  # Disable RabbitMQ by default for GCP
+  rabbitmq:
+    enabled: false
+
+# =============================================================================
+# GCP Validation Adapter Configuration
+# =============================================================================
+validation-gcp:
+  enabled: true
+  replicaCount: 1
+  # Use "dummy" for testing, "real" when validation-gcp-adapter.yaml exists
+  deploymentMode: "dummy"
+  image:
+    registry: quay.io/openshift-hyperfleet
+    repository: hyperfleet-adapter
+    tag: latest
+  serviceAccount:
+    create: true
+    annotations: {}
+    # Set for Workload Identity:
+    # iam.gke.io/gcp-service-account: validation-gcp@PROJECT.iam.gserviceaccount.com
+  hyperfleetApi:
+    baseUrl: "http://hyperfleet-api:8000"
+    version: "v1"
+  broker:
+    type: googlepubsub
+    googlepubsub:
+      projectId: ""
+      topic: ""
+      subscription: ""
+      deadLetterTopic: ""
+    subscriber:
+      parallelism: 1

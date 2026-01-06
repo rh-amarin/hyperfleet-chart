@@ -1,0 +1,51 @@
+HyperFleet for Google Cloud Platform has been deployed!
+
+Components:
+  - HyperFleet API: Cluster lifecycle management
+  - Sentinel: Resource polling and event publishing
+  - Landing Zone Adapter: Namespace creation
+  - Validation GCP Adapter: GCP cluster validation
+{{- if .Values.base.rabbitmq.enabled }}
+  - RabbitMQ: In-cluster message broker (development mode)
+{{- end }}
+
+Broker Configuration:
+{{- if eq .Values.base.global.broker.type "googlepubsub" }}
+  Type: Google Pub/Sub
+  Project: {{ .Values.base.global.broker.googlepubsub.projectId | default "NOT SET - Please configure!" }}
+{{- else }}
+  Type: RabbitMQ (development mode)
+{{- end }}
+
+{{- if eq .Values.base.global.broker.type "googlepubsub" }}
+
+Workload Identity Setup:
+  Ensure your Kubernetes Service Accounts are bound to GCP Service Accounts:
+
+  # Sentinel
+  gcloud iam service-accounts add-iam-policy-binding \
+    sentinel@PROJECT.iam.gserviceaccount.com \
+    --role roles/iam.workloadIdentityUser \
+    --member "serviceAccount:PROJECT.svc.id.goog[{{ .Release.Namespace }}/sentinel]"
+
+  # Landing Zone
+  gcloud iam service-accounts add-iam-policy-binding \
+    landing-zone@PROJECT.iam.gserviceaccount.com \
+    --role roles/iam.workloadIdentityUser \
+    --member "serviceAccount:PROJECT.svc.id.goog[{{ .Release.Namespace }}/landing-zone-adapter]"
+
+  # Validation GCP
+  gcloud iam service-accounts add-iam-policy-binding \
+    validation-gcp@PROJECT.iam.gserviceaccount.com \
+    --role roles/iam.workloadIdentityUser \
+    --member "serviceAccount:PROJECT.svc.id.goog[{{ .Release.Namespace }}/validation-gcp-adapter]"
+{{- end }}
+
+To check the status:
+  kubectl get pods -n {{ .Release.Namespace }}
+
+To view logs:
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=hyperfleet-api
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=sentinel
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=landing-zone
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=validation-gcp
