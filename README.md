@@ -1,259 +1,208 @@
-# HyperFleet Umbrella Chart
+# HyperFleet Helm Charts
 
-Official Helm chart for deploying the complete HyperFleet platform - API, Adapter, and Sentinel components.
+Official Helm charts for deploying the HyperFleet platform.
 
-## Overview
+## Chart Structure
 
-This umbrella chart deploys all HyperFleet components with a single command:
+This repository uses a **base + overlay** pattern for multi-cloud support:
 
-- **hyperfleet-api** - Cluster lifecycle management REST API with PostgreSQL
-- **hyperfleet-adapter** - Event-driven adapter for cluster provisioning
-- **sentinel** - Resource polling and event publishing service
-- **rabbitmq** - Message broker for event-driven communication (dev)
+```
+hyperfleet-chart/
+  charts/
+    hyperfleet-base/     # Core platform (API, Sentinel, Landing Zone)
+    hyperfleet-gcp/      # GCP overlay (validation-gcp, Pub/Sub defaults)
+  examples/
+    gcp-dev/             # GCP + RabbitMQ for development
+    gcp-prod/            # GCP + Pub/Sub for production
+```
+
+### hyperfleet-base
+
+Core platform components that work on any cloud:
+- **hyperfleet-api** - Cluster lifecycle management REST API
+- **sentinel** - Resource polling and event publishing
+- **landing-zone** - Adapter that creates cluster namespaces
+- **rabbitmq** - In-cluster broker for development
+
+### hyperfleet-gcp
+
+GCP-specific overlay that adds:
+- **validation-gcp** - GCP cluster validation adapter
+- Google Pub/Sub as default broker
+- Workload Identity configuration
 
 ## Prerequisites
 
 - Kubernetes 1.19+
 - Helm 3.0+
-- Access to component container images (quay.io/openshift-hyperfleet or personal registry)
+- [helm-git plugin](https://github.com/aslafy-z/helm-git)
+
+```bash
+helm plugin install https://github.com/aslafy-z/helm-git
+```
 
 ## Quick Start
 
-### Development Deployment
+### GCP Development (RabbitMQ)
 
 ```bash
-# Clone all repos to the same parent directory
-git clone git@github.com:openshift-hyperfleet/hyperfleet-chart.git
-git clone git@github.com:openshift-hyperfleet/hyperfleet-api.git
-git clone git@github.com:openshift-hyperfleet/hyperfleet-adapter.git
-git clone git@github.com:openshift-hyperfleet/hyperfleet-sentinel.git
-
-# Update dependencies (pulls from local paths)
-cd hyperfleet-chart
+cd charts/hyperfleet-gcp
 helm dependency update
-
-# Deploy to cluster
-helm install hyperfleet . \
-  --namespace hyperfleet-system \
-  --create-namespace
+helm install hyperfleet . -f values-dev.yaml \
+  -n hyperfleet-system --create-namespace
 ```
 
-### Using Custom Dev Images
+### GCP Production (Pub/Sub)
 
 ```bash
-# Copy and customize dev values
-cp values-dev.yaml.example values-dev.yaml
-# Edit values-dev.yaml with your quay username and image tags
-
-# Deploy with dev values
+cd charts/hyperfleet-gcp
+helm dependency update
 helm install hyperfleet . \
-  -f values-dev.yaml \
-  --namespace hyperfleet-system \
-  --create-namespace
+  -f ../../examples/gcp-prod/values.yaml \
+  --set base.global.broker.googlepubsub.projectId=YOUR_PROJECT \
+  -n hyperfleet-system --create-namespace
 ```
 
-### Using Google Pub/Sub (GKE)
+## Using Custom Images
 
-For GKE deployments with Google Pub/Sub instead of RabbitMQ:
+Each component has `make image-dev` for building custom images:
 
 ```bash
-# Copy and customize Pub/Sub values
-cp values-pubsub.yaml.example values-pubsub.yaml
-# Edit values-pubsub.yaml with your GCP project ID and service accounts
-
-# Deploy with Pub/Sub
-helm install hyperfleet . \
-  -f values-pubsub.yaml \
-  --namespace hyperfleet-system \
-  --create-namespace
+# Build dev images
+cd ../hyperfleet-api && QUAY_USER=myuser make image-dev
+cd ../hyperfleet-sentinel && QUAY_USER=myuser make image-dev
+cd ../adapter-landing-zone && QUAY_USER=myuser make image-dev
+cd ../adapter-validation-gcp && QUAY_USER=myuser make image-dev
 ```
 
-Prerequisites for Pub/Sub:
-- GKE cluster with Workload Identity enabled
-- GCP service accounts with Pub/Sub IAM roles
-- Workload Identity bindings between KSA and GSA
-
-See [values-pubsub.yaml.example](values-pubsub.yaml.example) for detailed configuration.
-
-Or set values directly:
+Deploy with custom images:
 
 ```bash
-helm install hyperfleet . \
-  --namespace hyperfleet-system \
-  --create-namespace \
-  --set global.imageRegistry=quay.io/yourusername \
-  --set global.imageTag=dev-abc1234
+# Copy and customize example values
+cp examples/gcp-dev/values.yaml my-values.yaml
+# Edit with your quay username and image tags
+
+helm install hyperfleet charts/hyperfleet-gcp -f my-values.yaml \
+  -n hyperfleet-system --create-namespace
 ```
 
 ## Configuration
 
-### Global Values
+### Broker Options
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `global.imageRegistry` | Override image registry for all components | `""` |
-| `global.imageTag` | Override image tag for all components | `""` |
-| `global.broker.type` | Broker type: `rabbitmq` or `googlepubsub` | `rabbitmq` |
-| `global.broker.googlepubsub.projectId` | GCP project ID for Pub/Sub | `""` |
-| `global.broker.googlepubsub.createTopicIfMissing` | Auto-create topics (dev only) | `true` |
-| `global.broker.googlepubsub.createSubscriptionIfMissing` | Auto-create subscriptions (dev only) | `true` |
+The broker is independent of cloud provider:
 
-### Component Enable/Disable
+| Deployment | Broker | Use Case |
+|------------|--------|----------|
+| GCP + RabbitMQ | In-cluster RabbitMQ | Development |
+| GCP + Pub/Sub | Google Pub/Sub | Production |
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `hyperfleet-api.enabled` | Deploy HyperFleet API | `true` |
-| `hyperfleet-adapter.enabled` | Deploy HyperFleet Adapter (requires custom AdapterConfig) | `false` |
-| `sentinel.enabled` | Deploy HyperFleet Sentinel | `true` |
-| `rabbitmq.enabled` | Deploy RabbitMQ broker (dev) | `true` |
-
-**Note**: The adapter is disabled by default because it requires a custom `AdapterConfig` (adapter.yaml) specific to your cloud provider and deployment scenario. See [hyperfleet-adapter config template](../hyperfleet-adapter/configs/adapter-config-template.yaml) for examples.
-
-### Subchart Values
-
-Each component's values can be customized using the subchart name prefix:
+Override broker in GCP overlay:
 
 ```yaml
-# API configuration
-hyperfleet-api:
-  replicaCount: 2
-  database:
-    postgresql:
-      enabled: true
-
-# Adapter configuration
-hyperfleet-adapter:
-  replicaCount: 1
-
-# Sentinel configuration
-sentinel:
-  replicaCount: 1
+# Use RabbitMQ for development
+base:
+  global:
+    broker:
+      type: rabbitmq
+      rabbitmq:
+        enabled: true
+  rabbitmq:
+    enabled: true
 ```
 
-See individual subchart documentation for all available values:
-- [hyperfleet-api values](../hyperfleet-api/charts/values.yaml)
-- [hyperfleet-adapter values](../hyperfleet-adapter/charts/values.yaml)
-- [sentinel values](../hyperfleet-sentinel/deployments/helm/sentinel/values.yaml)
+### Workload Identity (GCP)
+
+For Pub/Sub access, configure Workload Identity:
+
+```yaml
+base:
+  sentinel:
+    serviceAccount:
+      annotations:
+        iam.gke.io/gcp-service-account: sentinel@PROJECT.iam.gserviceaccount.com
+
+  landing-zone:
+    serviceAccount:
+      annotations:
+        iam.gke.io/gcp-service-account: landing-zone@PROJECT.iam.gserviceaccount.com
+
+validation-gcp:
+  serviceAccount:
+    annotations:
+      iam.gke.io/gcp-service-account: validation-gcp@PROJECT.iam.gserviceaccount.com
+```
 
 ## Chart Dependencies
 
-This chart uses local file references for HyperFleet components:
+Charts pull dependencies from GitHub using helm-git:
 
 ```yaml
+# hyperfleet-base
 dependencies:
   - name: hyperfleet-api
-    repository: "file://../hyperfleet-api/charts"
-  - name: hyperfleet-adapter
-    repository: "file://../hyperfleet-adapter/charts"
+    repository: "git+https://github.com/openshift-hyperfleet/hyperfleet-api@charts?ref=main"
   - name: sentinel
-    repository: "file://../hyperfleet-sentinel/deployments/helm/sentinel"
+    repository: "git+https://github.com/openshift-hyperfleet/hyperfleet-sentinel@deployments/helm/sentinel?ref=main"
+  - name: landing-zone
+    repository: "git+https://github.com/openshift-hyperfleet/adapter-landing-zone@charts?ref=main"
+
+# hyperfleet-gcp
+dependencies:
+  - name: hyperfleet-base
+    repository: "file://../hyperfleet-base"
+  - name: validation-gcp
+    repository: "git+https://github.com/openshift-hyperfleet/adapter-validation-gcp@charts?ref=main"
 ```
 
-RabbitMQ is deployed as a simple template (using `rabbitmq:3-management` image) for development.
+## Examples
 
-**Important**: All component repositories must be cloned to the same parent directory.
+See [examples/](examples/) for ready-to-use values files:
 
-## Usage Examples
-
-### Deploy with External Database (Production)
-
-```bash
-# Create database secret
-kubectl create secret generic hyperfleet-db-external \
-  --namespace hyperfleet-system \
-  --from-literal=db.host=your-cloudsql-ip \
-  --from-literal=db.port=5432 \
-  --from-literal=db.name=hyperfleet \
-  --from-literal=db.user=hyperfleet \
-  --from-literal=db.password=your-password
-
-# Deploy with external database
-helm install hyperfleet . \
-  --namespace hyperfleet-system \
-  --set hyperfleet-api.database.postgresql.enabled=false \
-  --set hyperfleet-api.database.external.enabled=true \
-  --set hyperfleet-api.database.external.secretName=hyperfleet-db-external
-```
-
-### Deploy Only Specific Components
-
-```bash
-# Deploy only API (no Adapter, Sentinel, or RabbitMQ)
-helm install hyperfleet . \
-  --namespace hyperfleet-system \
-  --set hyperfleet-adapter.enabled=false \
-  --set sentinel.enabled=false \
-  --set rabbitmq.enabled=false
-```
-
-### Production Deployment (External Broker)
-
-For production, disable the built-in RabbitMQ and configure external broker (Google Pub/Sub):
-
-```bash
-helm install hyperfleet . \
-  --namespace hyperfleet-system \
-  --set rabbitmq.enabled=false \
-  --set sentinel.broker.type=googlepubsub \
-  --set sentinel.broker.googlepubsub.projectId=my-gcp-project \
-  --set hyperfleet-adapter.broker.type=googlepubsub \
-  --set hyperfleet-adapter.broker.env.BROKER_GOOGLEPUBSUB_PROJECT_ID=my-gcp-project
-```
-
-### Upgrade Deployment
-
-```bash
-helm upgrade hyperfleet . --namespace hyperfleet-system
-```
-
-### Uninstall
-
-```bash
-helm uninstall hyperfleet --namespace hyperfleet-system
-```
+- [examples/gcp-dev/values.yaml](examples/gcp-dev/values.yaml) - GCP development with RabbitMQ
+- [examples/gcp-prod/values.yaml](examples/gcp-prod/values.yaml) - GCP production with Pub/Sub
 
 ## Troubleshooting
 
-### Check Deployed Resources
+### Check Status
 
 ```bash
-kubectl get all -n hyperfleet-system
+kubectl get pods -n hyperfleet-system
 ```
 
 ### View Logs
 
 ```bash
-# API logs
 kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=hyperfleet-api
-
-# Adapter logs
-kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=hyperfleet-adapter
-
-# Sentinel logs
 kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=sentinel
-
-# RabbitMQ logs
-kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=rabbitmq
+kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=landing-zone
+kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=validation-gcp
 ```
 
-### Access RabbitMQ Management UI
+### RabbitMQ Management UI
 
 ```bash
 kubectl port-forward -n hyperfleet-system svc/hyperfleet-rabbitmq 15672:15672
-# Open http://localhost:15672 (credentials: hyperfleet / hyperfleet-dev-password)
+# Open http://localhost:15672 (hyperfleet / hyperfleet-dev-password)
 ```
 
-### Dependency Update Fails
+## Migration from Legacy Chart
 
-Ensure all component repos are cloned to the same parent directory:
+The root-level Chart.yaml is deprecated. Migrate to cloud-specific overlays:
 
+```bash
+# Old (deprecated)
+helm install hyperfleet . -f values.yaml
+
+# New (recommended)
+helm install hyperfleet charts/hyperfleet-gcp -f examples/gcp-prod/values.yaml
 ```
-parent-dir/
-├── hyperfleet-chart/     # This repo
-├── hyperfleet-api/
-├── hyperfleet-adapter/
-└── hyperfleet-sentinel/
-```
+
+## Future Cloud Support
+
+Additional cloud overlays can be added following the same pattern:
+- `hyperfleet-aws` - AWS with SNS/SQS, IRSA
+- `hyperfleet-azure` - Azure with Service Bus, Workload Identity
 
 ## License
 

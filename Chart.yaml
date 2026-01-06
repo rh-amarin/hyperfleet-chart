@@ -1,6 +1,19 @@
+# DEPRECATED: This root chart is deprecated in favor of cloud-specific overlay charts.
+#
+# Please use the new chart structure:
+#   - charts/hyperfleet-gcp/  - For GCP deployments (GKE, Pub/Sub, Workload Identity)
+#   - charts/hyperfleet-aws/  - For AWS deployments (coming soon)
+#   - charts/hyperfleet-azure/ - For Azure deployments (coming soon)
+#
+# Migration:
+#   OLD: helm install hyperfleet . -f values.yaml
+#   NEW: helm install hyperfleet charts/hyperfleet-gcp -f examples/gcp-prod/values.yaml
+#
+# See README.md for full migration guide.
+
 apiVersion: v2
 name: hyperfleet
-description: HyperFleet Platform - Umbrella chart for deploying the complete HyperFleet stack
+description: "[DEPRECATED] HyperFleet Platform - Use charts/hyperfleet-gcp instead"
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
@@ -18,18 +31,23 @@ dependencies:
   # HyperFleet API - Cluster lifecycle management REST API
   - name: hyperfleet-api
     version: "1.0.0"
-    repository: "file://../hyperfleet-api/charts"
+    repository: "git+https://github.com/openshift-hyperfleet/hyperfleet-api@charts?ref=main"
     condition: hyperfleet-api.enabled
-
-  # HyperFleet Adapter - Event-driven adapter for cluster provisioning
-  - name: hyperfleet-adapter
-    version: "1.0.0"
-    repository: "file://../hyperfleet-adapter/charts"
-    condition: hyperfleet-adapter.enabled
 
   # HyperFleet Sentinel - Resource polling and event publishing
   - name: sentinel
     version: "0.1.0"
-    repository: "file://../hyperfleet-sentinel/deployments/helm/sentinel"
+    repository: "git+https://github.com/openshift-hyperfleet/hyperfleet-sentinel@deployments/helm/sentinel?ref=main"
     condition: sentinel.enabled
 
+  # Adapter: Landing Zone - Creates cluster namespaces
+  - name: landing-zone
+    version: "1.0.0"
+    repository: "git+https://github.com/openshift-hyperfleet/adapter-landing-zone@charts?ref=main"
+    condition: landing-zone.enabled
+
+  # Adapter: Validation GCP - Validates cluster resources on GCP
+  - name: validation-gcp
+    version: "1.0.0"
+    repository: "git+https://github.com/openshift-hyperfleet/adapter-validation-gcp@charts?ref=main"
+    condition: validation-gcp.enabled
