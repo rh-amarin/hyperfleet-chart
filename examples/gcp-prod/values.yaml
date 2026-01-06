@@ -1,0 +1,118 @@
+# HyperFleet GCP Production Example
+#
+# Use this for GKE production deployments with Pub/Sub.
+# Copy and customize with your GCP project settings.
+#
+# Prerequisites:
+#   1. GKE cluster with Workload Identity enabled
+#   2. GCP service accounts with Pub/Sub roles
+#   3. Workload Identity bindings configured
+#   4. Pub/Sub topics and subscriptions created (via Terraform)
+#
+# Usage:
+#   cd charts/hyperfleet-gcp
+#   helm dependency update
+#   helm install hyperfleet . -f ../../examples/gcp-prod/values.yaml \
+#     -n hyperfleet-system --create-namespace
+
+base:
+  global:
+    image:
+      registry: "quay.io/YOUR_QUAY_USERNAME"
+      tag: ""
+
+    broker:
+      type: googlepubsub
+      googlepubsub:
+        enabled: true
+        projectId: "YOUR_GCP_PROJECT"
+        createTopicIfMissing: false
+        createSubscriptionIfMissing: false
+      rabbitmq:
+        enabled: false
+
+  hyperfleet-api:
+    enabled: true
+    replicaCount: 1
+    image:
+      tag: "dev-API_GIT_SHA"
+    database:
+      postgresql:
+        enabled: true
+        password: "CHANGE_ME_IN_PRODUCTION"
+
+  sentinel:
+    enabled: true
+    replicaCount: 1
+    image:
+      registry: "quay.io/YOUR_QUAY_USERNAME"
+      repository: sentinel
+      tag: "dev-SENTINEL_GIT_SHA"
+    serviceAccount:
+      create: true
+      name: sentinel
+      annotations:
+        iam.gke.io/gcp-service-account: sentinel-USER@YOUR_GCP_PROJECT.iam.gserviceaccount.com
+    config:
+      resourceSelector: []
+    broker:
+      type: googlepubsub
+      topic: "hyperfleet-system-clusters-USER"
+      googlepubsub:
+        projectId: "YOUR_GCP_PROJECT"
+        ackDeadlineSeconds: 60
+        maxOutstandingMessages: 1000
+        numGoroutines: 10
+        createTopicIfMissing: false
+
+  landing-zone:
+    enabled: true
+    replicaCount: 1
+    image:
+      tag: "dev-ADAPTER_GIT_SHA"
+    serviceAccount:
+      create: true
+      name: landing-zone-adapter
+      annotations:
+        iam.gke.io/gcp-service-account: landing-zone-USER@YOUR_GCP_PROJECT.iam.gserviceaccount.com
+    hyperfleetApi:
+      baseUrl: "http://hyperfleet-api:8000"
+      version: "v1"
+    broker:
+      type: googlepubsub
+      googlepubsub:
+        projectId: "YOUR_GCP_PROJECT"
+        topic: "hyperfleet-system-clusters-USER"
+        subscription: "hyperfleet-system-clusters-landing-zone-adapter-USER"
+        deadLetterTopic: "hyperfleet-system-clusters-USER-dlq"
+      subscriber:
+        parallelism: 1
+
+  rabbitmq:
+    enabled: false
+
+validation-gcp:
+  enabled: true
+  replicaCount: 1
+  deploymentMode: "dummy"  # Use "real" when validation-gcp-adapter.yaml exists
+  image:
+    registry: "quay.io/YOUR_QUAY_USERNAME"
+    repository: hyperfleet-adapter
+    tag: "dev-ADAPTER_GIT_SHA"
+  serviceAccount:
+    create: true
+    name: validation-gcp-adapter
+    annotations:
+      iam.gke.io/gcp-service-account: validation-gcp-USER@YOUR_GCP_PROJECT.iam.gserviceaccount.com
+  hyperfleetApi:
+    baseUrl: "http://hyperfleet-api:8000"
+    version: "v1"
+  broker:
+    type: googlepubsub
+    googlepubsub:
+      projectId: "YOUR_GCP_PROJECT"
+      topic: "hyperfleet-system-clusters-USER"
+      subscription: "hyperfleet-system-clusters-validation-gcp-adapter-USER"
+      deadLetterTopic: "hyperfleet-system-clusters-USER-dlq"
+    subscriber:
+      parallelism: 1

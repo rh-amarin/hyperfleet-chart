@@ -1,0 +1,62 @@
+# HyperFleet GCP Development Example
+#
+# Use this for local development with RabbitMQ.
+# Copy and customize for your environment.
+#
+# Usage:
+#   cd charts/hyperfleet-gcp
+#   helm dependency update
+#   helm install hyperfleet . -f ../../examples/gcp-dev/values.yaml \
+#     -n hyperfleet-system --create-namespace
+
+# Override image registry/tags for custom builds
+base:
+  global:
+    image:
+      registry: "quay.io/YOUR_QUAY_USERNAME"
+      tag: ""  # Leave empty, override per-component below
+
+    broker:
+      type: rabbitmq
+      rabbitmq:
+        enabled: true
+      googlepubsub:
+        enabled: false
+
+  hyperfleet-api:
+    enabled: true
+    image:
+      tag: "dev-API_GIT_SHA"
+
+  sentinel:
+    enabled: true
+    image:
+      registry: "quay.io/YOUR_QUAY_USERNAME"
+      repository: sentinel
+      tag: "dev-SENTINEL_GIT_SHA"
+    broker:
+      type: rabbitmq
+      topic: "hyperfleet-clusters"
+
+  landing-zone:
+    enabled: true
+    image:
+      tag: "dev-ADAPTER_GIT_SHA"
+    broker:
+      type: rabbitmq
+
+  rabbitmq:
+    enabled: true
+    auth:
+      username: hyperfleet
+      password: hyperfleet-dev-password
+
+validation-gcp:
+  enabled: true
+  deploymentMode: "dummy"
+  image:
+    registry: "quay.io/YOUR_QUAY_USERNAME"
+    repository: hyperfleet-adapter
+    tag: "dev-ADAPTER_GIT_SHA"
+  broker:
+    type: rabbitmq
