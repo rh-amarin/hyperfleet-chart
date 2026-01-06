@@ -1,0 +1,146 @@
+# HyperFleet Base Platform - Default Values
+#
+# This chart deploys the core HyperFleet platform components:
+# - HyperFleet API (cluster lifecycle management)
+# - Sentinel (resource polling and event publishing)
+# - Landing Zone Adapter (namespace creation)
+# - RabbitMQ (optional, for development)
+#
+# Use cloud-specific overlay charts (hyperfleet-gcp, etc.) for production deployments.
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+global:
+  # Shared image settings - override per-component if needed
+  image:
+    registry: ""  # e.g., "quay.io/croche" for custom builds
+    tag: ""       # e.g., "dev-abc123" for custom builds
+
+  # Broker abstraction layer
+  # Cloud overlays can override these defaults
+  broker:
+    # Broker type: rabbitmq, googlepubsub, aws-sqs (future)
+    type: rabbitmq
+
+    # Topic naming - default uses namespace
+    topicPrefix: ""
+
+    # RabbitMQ configuration (default for development)
+    rabbitmq:
+      enabled: true
+      # URL is auto-generated if in-cluster RabbitMQ is enabled
+      # Override for external RabbitMQ
+      url: ""
+
+    # Google Pub/Sub configuration
+    googlepubsub:
+      enabled: false
+      projectId: ""
+      createTopicIfMissing: false
+      createSubscriptionIfMissing: false
+
+    # AWS SNS/SQS configuration (future)
+    aws:
+      enabled: false
+      region: ""
+
+# =============================================================================
+# HyperFleet API Configuration
+# =============================================================================
+hyperfleet-api:
+  enabled: true
+  replicaCount: 1
+  image:
+    registry: quay.io/openshift-hyperfleet
+    repository: hyperfleet-api
+    tag: latest
+  database:
+    # Built-in PostgreSQL for development
+    postgresql:
+      enabled: true
+      password: "dev-password-change-me"
+    # External database for production
+    external:
+      enabled: false
+      secretName: ""
+
+# =============================================================================
+# Sentinel Configuration
+# =============================================================================
+sentinel:
+  enabled: true
+  replicaCount: 1
+  image:
+    registry: quay.io/openshift-hyperfleet
+    repository: sentinel
+    tag: latest
+  serviceAccount:
+    create: true
+    annotations: {}
+  config:
+    resourceType: clusters
+    pollInterval: 5s
+    resourceSelector: []
+  # Broker config - inherits from global.broker
+  broker:
+    type: rabbitmq
+    topic: "hyperfleet-clusters"
+    rabbitmq:
+      url: ""  # Auto-generated if empty
+    googlepubsub:
+      projectId: ""
+      ackDeadlineSeconds: 60
+      maxOutstandingMessages: 1000
+      numGoroutines: 10
+      createTopicIfMissing: false
+
+# =============================================================================
+# Landing Zone Adapter Configuration
+# =============================================================================
+landing-zone:
+  enabled: true
+  replicaCount: 1
+  image:
+    registry: quay.io/openshift-hyperfleet
+    repository: hyperfleet-adapter
+    tag: latest
+  serviceAccount:
+    create: true
+    annotations: {}
+  hyperfleetApi:
+    baseUrl: "http://hyperfleet-api:8000"
+    version: "v1"
+  # Broker config - inherits from global.broker
+  broker:
+    type: rabbitmq
+    googlepubsub:
+      projectId: ""
+      topic: ""
+      subscription: ""
+      deadLetterTopic: ""
+    rabbitmq:
+      url: ""
+    subscriber:
+      parallelism: 1
+
+# =============================================================================
+# RabbitMQ Configuration (Development)
+# =============================================================================
+# Simple in-cluster RabbitMQ for development and testing.
+# Disable for production and use external managed broker.
+rabbitmq:
+  enabled: true
+  image:
+    repository: rabbitmq
+    tag: 3-management
+  auth:
+    username: hyperfleet
+    password: hyperfleet-dev-password
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi

@@ -1,0 +1,36 @@
+HyperFleet Base Platform has been deployed!
+
+Components:
+{{- if index .Values "hyperfleet-api" "enabled" }}
+  - HyperFleet API: Cluster lifecycle management
+{{- end }}
+{{- if .Values.sentinel.enabled }}
+  - Sentinel: Resource polling and event publishing
+{{- end }}
+{{- if index .Values "landing-zone" "enabled" }}
+  - Landing Zone Adapter: Namespace creation
+{{- end }}
+{{- if .Values.rabbitmq.enabled }}
+  - RabbitMQ: In-cluster message broker (development)
+{{- end }}
+
+Broker Configuration:
+  Type: {{ .Values.global.broker.type }}
+{{- if eq .Values.global.broker.type "rabbitmq" }}
+  URL: {{ include "hyperfleet-base.rabbitmqUrl" . }}
+{{- else if eq .Values.global.broker.type "googlepubsub" }}
+  Project: {{ .Values.global.broker.googlepubsub.projectId }}
+{{- end }}
+
+To check the status:
+  kubectl get pods -n {{ .Release.Namespace }}
+
+To view API logs:
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=hyperfleet-api
+
+To view Sentinel logs:
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=sentinel
+
+For production deployments, use a cloud-specific overlay chart:
+  - hyperfleet-gcp: For Google Cloud Platform (Pub/Sub, Workload Identity)
+  - hyperfleet-aws: For Amazon Web Services (SNS/SQS, IRSA) - coming soon
