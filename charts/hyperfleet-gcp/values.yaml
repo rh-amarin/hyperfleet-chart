@@ -84,7 +84,7 @@ validation-gcp:
   image:
     registry: quay.io/openshift-hyperfleet
     repository: hyperfleet-adapter
-    tag: latest
+    tag: ""  # Required: Set to specific version (e.g., "v1.0.0" or "dev-abc1234")
   serviceAccount:
     create: true
     annotations: {}

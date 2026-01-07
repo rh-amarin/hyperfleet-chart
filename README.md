@@ -6,7 +6,7 @@ Official Helm charts for deploying the HyperFleet platform.
 
 This repository uses a **base + overlay** pattern for multi-cloud support:
 
-```
+```text
 hyperfleet-chart/
   charts/
     hyperfleet-base/     # Core platform (API, Sentinel, Landing Zone)

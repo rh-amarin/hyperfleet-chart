@@ -43,7 +43,8 @@ base:
     database:
       postgresql:
         enabled: true
-        password: "CHANGE_ME_IN_PRODUCTION"
+        # password must be set via --set base.hyperfleet-api.database.postgresql.password=<value>
+        # or configure existingSecret for production use
 
   sentinel:
     enabled: true
@@ -92,7 +93,10 @@ base:
 validation-gcp:
   enabled: true
   replicaCount: 1
-  deploymentMode: "dummy"  # Use "real" when validation-gcp-adapter.yaml exists
+  # NOTE: "dummy" mode returns mock validation responses. Switch to "real" mode
+  # once the validation-gcp adapter has real GCP validation logic implemented.
+  # See: https://github.com/openshift-hyperfleet/adapter-validation-gcp
+  deploymentMode: "dummy"
   image:
     registry: "quay.io/YOUR_QUAY_USERNAME"
     repository: adapter-validation-gcp

@@ -17,7 +17,7 @@ Components:
 Broker Configuration:
   Type: {{ .Values.global.broker.type }}
 {{- if eq .Values.global.broker.type "rabbitmq" }}
-  URL: {{ include "hyperfleet-base.rabbitmqUrl" . }}
+  URL: amqp://{{ .Values.rabbitmq.auth.username }}:****@{{ .Release.Name }}-rabbitmq:5672/
 {{- else if eq .Values.global.broker.type "googlepubsub" }}
   Project: {{ .Values.global.broker.googlepubsub.projectId }}
 {{- end }}
