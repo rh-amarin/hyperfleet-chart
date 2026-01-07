@@ -7,7 +7,7 @@ Components:
 {{- if .Values.sentinel.enabled }}
   - Sentinel: Resource polling and event publishing
 {{- end }}
-{{- if index .Values "landing-zone" "enabled" }}
+{{- if index .Values "adapter-landing-zone" "enabled" }}
   - Landing Zone Adapter: Namespace creation
 {{- end }}
 {{- if .Values.rabbitmq.enabled }}

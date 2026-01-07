@@ -20,6 +20,11 @@ base:
     image:
       registry: ""  # e.g., "quay.io/croche" for custom builds
 
+    # HyperFleet API endpoint - used by sentinel and all adapters
+    hyperfleetApi:
+      baseUrl: "http://hyperfleet-hyperfleet-api:8000"
+      version: "v1"
+
     broker:
       # Default to Pub/Sub for GCP production
       type: googlepubsub
@@ -31,9 +36,6 @@ base:
         enabled: true
         # REQUIRED: Set your GCP project ID
         projectId: ""
-        # Set to true for development if topics/subscriptions don't exist
-        createTopicIfMissing: false
-        createSubscriptionIfMissing: false
 
   # API configuration
   hyperfleet-api:
@@ -48,13 +50,12 @@ base:
       # Set for Workload Identity:
       # iam.gke.io/gcp-service-account: sentinel@PROJECT.iam.gserviceaccount.com
     broker:
-      type: googlepubsub
       topic: ""  # Set your topic name
       googlepubsub:
         projectId: ""
 
-  # Landing Zone with GCP defaults
-  landing-zone:
+  # Landing Zone Adapter with GCP defaults
+  adapter-landing-zone:
     enabled: true
     serviceAccount:
       create: true
@@ -62,7 +63,6 @@ base:
       # Set for Workload Identity:
       # iam.gke.io/gcp-service-account: landing-zone@PROJECT.iam.gserviceaccount.com
     broker:
-      type: googlepubsub
       googlepubsub:
         projectId: ""
         topic: ""
@@ -90,11 +90,9 @@ validation-gcp:
     annotations: {}
     # Set for Workload Identity:
     # iam.gke.io/gcp-service-account: validation-gcp@PROJECT.iam.gserviceaccount.com
-  hyperfleetApi:
-    baseUrl: "http://hyperfleet-api:8000"
-    version: "v1"
+  # hyperfleetApi - inherits from base.global.hyperfleetApi
+  # broker.type - inherits from base.global.broker.type
   broker:
-    type: googlepubsub
     googlepubsub:
       projectId: ""
       topic: ""

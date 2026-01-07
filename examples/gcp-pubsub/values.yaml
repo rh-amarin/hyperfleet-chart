@@ -1,7 +1,7 @@
-# HyperFleet GCP Production Example
+# HyperFleet GCP + Pub/Sub Example
 #
-# Use this for GKE production deployments with Pub/Sub.
-# Copy and customize with your GCP project settings.
+# Use this for GCP deployments with Google Pub/Sub broker.
+# Recommended for production GKE environments.
 #
 # Prerequisites:
 #   1. GKE cluster with Workload Identity enabled
@@ -12,7 +12,7 @@
 # Usage:
 #   cd charts/hyperfleet-gcp
 #   helm dependency update
-#   helm install hyperfleet . -f ../../examples/gcp-prod/values.yaml \
+#   helm install hyperfleet . -f ../../examples/gcp-pubsub/values.yaml \
 #     -n hyperfleet-system --create-namespace
 
 base:
@@ -21,13 +21,16 @@ base:
       registry: "quay.io/YOUR_QUAY_USERNAME"
       tag: ""
 
+    # HyperFleet API endpoint - used by sentinel and all adapters
+    hyperfleetApi:
+      baseUrl: "http://hyperfleet-hyperfleet-api:8000"
+      version: "v1"
+
     broker:
       type: googlepubsub
       googlepubsub:
         enabled: true
         projectId: "YOUR_GCP_PROJECT"
-        createTopicIfMissing: false
-        createSubscriptionIfMissing: false
       rabbitmq:
         enabled: false
 
@@ -35,6 +38,7 @@ base:
     enabled: true
     replicaCount: 1
     image:
+      repository: hyperfleet-api
       tag: "dev-API_GIT_SHA"
     database:
       postgresql:
@@ -56,30 +60,24 @@ base:
     config:
       resourceSelector: []
     broker:
-      type: googlepubsub
       topic: "hyperfleet-system-clusters-USER"
       googlepubsub:
         projectId: "YOUR_GCP_PROJECT"
-        ackDeadlineSeconds: 60
         maxOutstandingMessages: 1000
         numGoroutines: 10
-        createTopicIfMissing: false
 
-  landing-zone:
+  adapter-landing-zone:
     enabled: true
     replicaCount: 1
     image:
+      repository: adapter-landing-zone
       tag: "dev-ADAPTER_GIT_SHA"
     serviceAccount:
       create: true
       name: landing-zone-adapter
       annotations:
         iam.gke.io/gcp-service-account: landing-zone-USER@YOUR_GCP_PROJECT.iam.gserviceaccount.com
-    hyperfleetApi:
-      baseUrl: "http://hyperfleet-api:8000"
-      version: "v1"
     broker:
-      type: googlepubsub
       googlepubsub:
         projectId: "YOUR_GCP_PROJECT"
         topic: "hyperfleet-system-clusters-USER"
@@ -97,18 +95,14 @@ validation-gcp:
   deploymentMode: "dummy"  # Use "real" when validation-gcp-adapter.yaml exists
   image:
     registry: "quay.io/YOUR_QUAY_USERNAME"
-    repository: hyperfleet-adapter
+    repository: adapter-validation-gcp
     tag: "dev-ADAPTER_GIT_SHA"
   serviceAccount:
     create: true
     name: validation-gcp-adapter
     annotations:
       iam.gke.io/gcp-service-account: validation-gcp-USER@YOUR_GCP_PROJECT.iam.gserviceaccount.com
-  hyperfleetApi:
-    baseUrl: "http://hyperfleet-api:8000"
-    version: "v1"
   broker:
-    type: googlepubsub
     googlepubsub:
       projectId: "YOUR_GCP_PROJECT"
       topic: "hyperfleet-system-clusters-USER"

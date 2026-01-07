@@ -12,8 +12,8 @@ hyperfleet-chart/
     hyperfleet-base/     # Core platform (API, Sentinel, Landing Zone)
     hyperfleet-gcp/      # GCP overlay (validation-gcp, Pub/Sub defaults)
   examples/
-    gcp-dev/             # GCP + RabbitMQ for development
-    gcp-prod/            # GCP + Pub/Sub for production
+    gcp-rabbitmq/        # GCP + RabbitMQ for development
+    gcp-pubsub/          # GCP + Pub/Sub for production
 ```
 
 ### hyperfleet-base
@@ -21,8 +21,8 @@ hyperfleet-chart/
 Core platform components that work on any cloud:
 - **hyperfleet-api** - Cluster lifecycle management REST API
 - **sentinel** - Resource polling and event publishing
-- **landing-zone** - Adapter that creates cluster namespaces
-- **rabbitmq** - In-cluster broker for development
+- **adapter-landing-zone** - Adapter that creates cluster namespaces
+- **rabbitmq** - Optional in-cluster broker for development
 
 ### hyperfleet-gcp
 
@@ -48,7 +48,7 @@ helm plugin install https://github.com/aslafy-z/helm-git
 ```bash
 cd charts/hyperfleet-gcp
 helm dependency update
-helm install hyperfleet . -f values-dev.yaml \
+helm install hyperfleet . -f values-rabbitmq.yaml \
   -n hyperfleet-system --create-namespace
 ```
 
@@ -58,7 +58,7 @@ helm install hyperfleet . -f values-dev.yaml \
 cd charts/hyperfleet-gcp
 helm dependency update
 helm install hyperfleet . \
-  -f ../../examples/gcp-prod/values.yaml \
+  -f ../../examples/gcp-pubsub/values.yaml \
   --set base.global.broker.googlepubsub.projectId=YOUR_PROJECT \
   -n hyperfleet-system --create-namespace
 ```
@@ -79,7 +79,7 @@ Deploy with custom images:
 
 ```bash
 # Copy and customize example values
-cp examples/gcp-dev/values.yaml my-values.yaml
+cp examples/gcp-rabbitmq/values.yaml my-values.yaml
 # Edit with your quay username and image tags
 
 helm install hyperfleet charts/hyperfleet-gcp -f my-values.yaml \
@@ -104,12 +104,16 @@ Override broker in GCP overlay:
 base:
   global:
     broker:
-      type: rabbitmq
-      rabbitmq:
-        enabled: true
+      type: rabbitmq           # Which broker type components should use
   rabbitmq:
-    enabled: true
+    enabled: true              # Deploy in-cluster RabbitMQ instance
 ```
+
+**Note:** There are two separate `rabbitmq` configurations:
+- `global.broker.type: rabbitmq` - Tells components (sentinel, adapters) to use RabbitMQ
+- `rabbitmq.enabled: true` - Deploys an in-cluster RabbitMQ server
+
+For production with external RabbitMQ, set `global.broker.type: rabbitmq` but keep `rabbitmq.enabled: false` and configure the URL in each component's `broker.rabbitmq.url`.
 
 ### Workload Identity (GCP)
 
@@ -122,7 +126,7 @@ base:
       annotations:
         iam.gke.io/gcp-service-account: sentinel@PROJECT.iam.gserviceaccount.com
 
-  landing-zone:
+  adapter-landing-zone:
     serviceAccount:
       annotations:
         iam.gke.io/gcp-service-account: landing-zone@PROJECT.iam.gserviceaccount.com
@@ -144,7 +148,7 @@ dependencies:
     repository: "git+https://github.com/openshift-hyperfleet/hyperfleet-api@charts?ref=main"
   - name: sentinel
     repository: "git+https://github.com/openshift-hyperfleet/hyperfleet-sentinel@deployments/helm/sentinel?ref=main"
-  - name: landing-zone
+  - name: adapter-landing-zone
     repository: "git+https://github.com/openshift-hyperfleet/adapter-landing-zone@charts?ref=main"
 
 # hyperfleet-gcp
@@ -159,8 +163,8 @@ dependencies:
 
 See [examples/](examples/) for ready-to-use values files:
 
-- [examples/gcp-dev/values.yaml](examples/gcp-dev/values.yaml) - GCP development with RabbitMQ
-- [examples/gcp-prod/values.yaml](examples/gcp-prod/values.yaml) - GCP production with Pub/Sub
+- [examples/gcp-rabbitmq/values.yaml](examples/gcp-rabbitmq/values.yaml) - GCP with RabbitMQ (development)
+- [examples/gcp-pubsub/values.yaml](examples/gcp-pubsub/values.yaml) - GCP with Pub/Sub (production)
 
 ## Troubleshooting
 
@@ -175,7 +179,7 @@ kubectl get pods -n hyperfleet-system
 ```bash
 kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=hyperfleet-api
 kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=sentinel
-kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=landing-zone
+kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=adapter-landing-zone
 kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=validation-gcp
 ```
 
@@ -195,7 +199,7 @@ The root-level Chart.yaml is deprecated. Migrate to cloud-specific overlays:
 helm install hyperfleet . -f values.yaml
 
 # New (recommended)
-helm install hyperfleet charts/hyperfleet-gcp -f examples/gcp-prod/values.yaml
+helm install hyperfleet charts/hyperfleet-gcp -f examples/gcp-pubsub/values.yaml
 ```
 
 ## Future Cloud Support

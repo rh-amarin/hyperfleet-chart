@@ -1,12 +1,12 @@
-# HyperFleet GCP Development Example
+# HyperFleet GCP + RabbitMQ Example
 #
-# Use this for local development with RabbitMQ.
-# Copy and customize for your environment.
+# Use this for GCP deployments with in-cluster RabbitMQ broker.
+# Suitable for development or environments without Pub/Sub access.
 #
 # Usage:
 #   cd charts/hyperfleet-gcp
 #   helm dependency update
-#   helm install hyperfleet . -f ../../examples/gcp-dev/values.yaml \
+#   helm install hyperfleet . -f ../../examples/gcp-rabbitmq/values.yaml \
 #     -n hyperfleet-system --create-namespace
 
 # Override image registry/tags for custom builds
@@ -15,6 +15,11 @@ base:
     image:
       registry: "quay.io/YOUR_QUAY_USERNAME"
       tag: ""  # Leave empty, override per-component below
+
+    # HyperFleet API endpoint - used by sentinel and all adapters
+    hyperfleetApi:
+      baseUrl: "http://hyperfleet-hyperfleet-api:8000"
+      version: "v1"
 
     broker:
       type: rabbitmq
@@ -26,6 +31,7 @@ base:
   hyperfleet-api:
     enabled: true
     image:
+      repository: hyperfleet-api
       tag: "dev-API_GIT_SHA"
 
   sentinel:
@@ -35,15 +41,13 @@ base:
       repository: sentinel
       tag: "dev-SENTINEL_GIT_SHA"
     broker:
-      type: rabbitmq
       topic: "hyperfleet-clusters"
 
-  landing-zone:
+  adapter-landing-zone:
     enabled: true
     image:
+      repository: adapter-landing-zone
       tag: "dev-ADAPTER_GIT_SHA"
-    broker:
-      type: rabbitmq
 
   rabbitmq:
     enabled: true
@@ -56,7 +60,9 @@ validation-gcp:
   deploymentMode: "dummy"
   image:
     registry: "quay.io/YOUR_QUAY_USERNAME"
-    repository: hyperfleet-adapter
+    repository: adapter-validation-gcp
     tag: "dev-ADAPTER_GIT_SHA"
   broker:
     type: rabbitmq
+    rabbitmq:
+      url: "amqp://hyperfleet:hyperfleet-dev-password@hyperfleet-rabbitmq:5672/"

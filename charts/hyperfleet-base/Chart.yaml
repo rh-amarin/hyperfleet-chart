@@ -34,4 +34,5 @@ dependencies:
   - name: landing-zone
     version: "1.0.0"
     repository: "git+https://github.com/openshift-hyperfleet/adapter-landing-zone@charts?ref=main"
-    condition: landing-zone.enabled
+    alias: adapter-landing-zone
+    condition: adapter-landing-zone.enabled

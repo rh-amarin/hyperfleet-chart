@@ -11,13 +11,14 @@
 #   make deps              - Update chart dependencies
 #   make lint              - Lint helm charts
 #   make template          - Render helm templates
-#   make test              - Run all tests
+#   make test-helm         - Run all helm chart tests
 
-.PHONY: help deps lint template test clean \
+.PHONY: help deps lint template test test-helm clean \
         deps-base deps-gcp \
         lint-base lint-gcp \
-        template-base template-gcp template-gcp-dev \
-        check-helm-git
+        template-base template-gcp template-gcp-rabbitmq \
+        install install-pubsub upgrade uninstall status \
+        test-templates check-helm-git
 
 # Default values
 RELEASE_NAME ?= hyperfleet
@@ -65,10 +66,10 @@ deps-gcp: deps-base ## Update hyperfleet-gcp dependencies (includes base)
 lint: lint-gcp ## Lint charts (GCP overlay includes base)
 
 lint-gcp: ## Lint hyperfleet-gcp chart (includes base chart validation)
-	@echo "$(GREEN)Linting hyperfleet-gcp (dev values)...$(NC)"
-	helm lint charts/hyperfleet-gcp -f charts/hyperfleet-gcp/values-dev.yaml
-	@echo "$(GREEN)Linting hyperfleet-gcp (prod values)...$(NC)"
-	helm lint charts/hyperfleet-gcp -f examples/gcp-prod/values.yaml
+	@echo "$(GREEN)Linting hyperfleet-gcp (RabbitMQ values)...$(NC)"
+	helm lint charts/hyperfleet-gcp -f charts/hyperfleet-gcp/values-rabbitmq.yaml
+	@echo "$(GREEN)Linting hyperfleet-gcp (Pub/Sub values)...$(NC)"
+	helm lint charts/hyperfleet-gcp -f examples/gcp-pubsub/values.yaml
 
 ##@ Template Rendering
 
@@ -82,71 +83,73 @@ template-gcp: ## Render hyperfleet-gcp templates (Pub/Sub)
 	@echo "$(GREEN)Rendering hyperfleet-gcp templates (Pub/Sub)...$(NC)"
 	helm template $(RELEASE_NAME) charts/hyperfleet-gcp \
 		--namespace $(NAMESPACE) \
-		-f examples/gcp-prod/values.yaml
+		-f examples/gcp-pubsub/values.yaml
 
-template-gcp-dev: ## Render hyperfleet-gcp templates (RabbitMQ)
-	@echo "$(GREEN)Rendering hyperfleet-gcp templates (RabbitMQ dev)...$(NC)"
+template-gcp-rabbitmq: ## Render hyperfleet-gcp templates (RabbitMQ)
+	@echo "$(GREEN)Rendering hyperfleet-gcp templates (RabbitMQ)...$(NC)"
 	helm template $(RELEASE_NAME) charts/hyperfleet-gcp \
 		--namespace $(NAMESPACE) \
-		-f charts/hyperfleet-gcp/values-dev.yaml
+		-f charts/hyperfleet-gcp/values-rabbitmq.yaml
 
 ##@ Testing
 
-test: deps lint test-templates ## Run all tests
+test: test-helm ## Run all tests (alias for test-helm)
+
+test-helm: deps lint test-templates ## Run all helm chart tests
 	@echo ""
 	@echo "$(GREEN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
-	@echo "$(GREEN)✅ All tests passed!$(NC)"
+	@echo "$(GREEN)All tests passed!$(NC)"
 	@echo "$(GREEN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
 
 test-templates: ## Validate all template configurations render without errors
 	@echo "$(GREEN)Validating template configurations...$(NC)"
 	@echo ""
-	@echo "📋 Testing hyperfleet-base (RabbitMQ default)..."
+	@echo "Testing hyperfleet-base (RabbitMQ default)..."
 	@helm template $(RELEASE_NAME) charts/hyperfleet-base --namespace $(NAMESPACE) > /dev/null
-	@echo "$(GREEN)✅ hyperfleet-base OK$(NC)"
+	@echo "$(GREEN)hyperfleet-base OK$(NC)"
 	@echo ""
-	@echo "📋 Testing hyperfleet-gcp (Pub/Sub)..."
+	@echo "Testing hyperfleet-gcp (Pub/Sub)..."
 	@helm template $(RELEASE_NAME) charts/hyperfleet-gcp \
 		--namespace $(NAMESPACE) \
-		-f examples/gcp-prod/values.yaml > /dev/null
-	@echo "$(GREEN)✅ hyperfleet-gcp (Pub/Sub) OK$(NC)"
+		-f examples/gcp-pubsub/values.yaml > /dev/null
+	@echo "$(GREEN)hyperfleet-gcp (Pub/Sub) OK$(NC)"
 	@echo ""
-	@echo "📋 Testing hyperfleet-gcp (RabbitMQ dev)..."
+	@echo "Testing hyperfleet-gcp (RabbitMQ)..."
 	@helm template $(RELEASE_NAME) charts/hyperfleet-gcp \
 		--namespace $(NAMESPACE) \
-		-f charts/hyperfleet-gcp/values-dev.yaml > /dev/null
-	@echo "$(GREEN)✅ hyperfleet-gcp (RabbitMQ) OK$(NC)"
+		-f charts/hyperfleet-gcp/values-rabbitmq.yaml > /dev/null
+	@echo "$(GREEN)hyperfleet-gcp (RabbitMQ) OK$(NC)"
 
 ##@ Deployment
 
-install: deps-gcp ## Install hyperfleet-gcp to cluster
-	@echo "$(GREEN)Installing hyperfleet-gcp...$(NC)"
+install: deps-gcp ## Install hyperfleet-gcp to cluster (RabbitMQ)
+	@echo "$(GREEN)Installing hyperfleet-gcp (RabbitMQ)...$(NC)"
 	helm install $(RELEASE_NAME) charts/hyperfleet-gcp \
 		--namespace $(NAMESPACE) \
 		--create-namespace \
-		-f charts/hyperfleet-gcp/values-dev.yaml
-	@echo "$(GREEN)✅ HyperFleet installed$(NC)"
+		-f charts/hyperfleet-gcp/values-rabbitmq.yaml
+	@echo "$(GREEN)HyperFleet installed$(NC)"
 
-install-prod: deps-gcp ## Install hyperfleet-gcp with production values (requires customization)
-	@echo "$(YELLOW)Installing hyperfleet-gcp (production)...$(NC)"
-	@echo "$(YELLOW)⚠️  Make sure to customize examples/gcp-prod/values.yaml first!$(NC)"
+install-pubsub: deps-gcp ## Install hyperfleet-gcp with Pub/Sub (requires customization)
+	@echo "$(YELLOW)Installing hyperfleet-gcp (Pub/Sub)...$(NC)"
+	@echo "$(YELLOW)Make sure to customize examples/gcp-pubsub/values.yaml first!$(NC)"
 	helm install $(RELEASE_NAME) charts/hyperfleet-gcp \
 		--namespace $(NAMESPACE) \
 		--create-namespace \
-		-f examples/gcp-prod/values.yaml
-	@echo "$(GREEN)✅ HyperFleet installed$(NC)"
+		-f examples/gcp-pubsub/values.yaml
+	@echo "$(GREEN)HyperFleet installed$(NC)"
 
 upgrade: deps-gcp ## Upgrade hyperfleet-gcp
 	@echo "$(GREEN)Upgrading hyperfleet-gcp...$(NC)"
 	helm upgrade $(RELEASE_NAME) charts/hyperfleet-gcp \
 		--namespace $(NAMESPACE) \
-		-f charts/hyperfleet-gcp/values-dev.yaml
-	@echo "$(GREEN)✅ HyperFleet upgraded$(NC)"
+		-f charts/hyperfleet-gcp/values-rabbitmq.yaml
+	@echo "$(GREEN)HyperFleet upgraded$(NC)"
 
 uninstall: ## Uninstall hyperfleet
 	@echo "$(YELLOW)Uninstalling hyperfleet...$(NC)"
 	helm uninstall $(RELEASE_NAME) --namespace $(NAMESPACE)
-	@echo "$(GREEN)✅ HyperFleet uninstalled$(NC)"
+	@echo "$(GREEN)HyperFleet uninstalled$(NC)"
 
 status: ## Show helm release status
 	helm status $(RELEASE_NAME) --namespace $(NAMESPACE)
@@ -161,4 +164,4 @@ clean: ## Remove generated files (dependency charts, lock files, packages)
 	rm -f charts/hyperfleet-gcp/Chart.lock
 	rm -f *.tgz
 	rm -f charts/*/*.tgz
-	@echo "$(GREEN)✅ Clean complete$(NC)"
+	@echo "$(GREEN)Clean complete$(NC)"
