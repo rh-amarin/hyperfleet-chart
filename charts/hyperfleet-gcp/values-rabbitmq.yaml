@@ -1,0 +1,48 @@
+# HyperFleet GCP Overlay - RabbitMQ Values
+#
+# Use this for GCP deployments with in-cluster RabbitMQ instead of Pub/Sub.
+# GCP validation adapter still works, just uses RabbitMQ for messaging.
+#
+# Usage:
+#   helm install hyperfleet . -f values-rabbitmq.yaml -n hyperfleet-system --create-namespace
+
+# =============================================================================
+# Base Chart Overrides - Use RabbitMQ
+# =============================================================================
+base:
+  global:
+    broker:
+      type: rabbitmq
+      rabbitmq:
+        enabled: true
+      googlepubsub:
+        enabled: false
+
+  sentinel:
+    broker:
+      topic: "hyperfleet-clusters"
+      rabbitmq:
+        url: "amqp://hyperfleet:hyperfleet-dev-password@hyperfleet-rabbitmq:5672/"
+
+  adapter-landing-zone:
+    broker:
+      rabbitmq:
+        url: "amqp://hyperfleet:hyperfleet-dev-password@hyperfleet-rabbitmq:5672/"
+
+  # Enable in-cluster RabbitMQ
+  rabbitmq:
+    enabled: true
+    auth:
+      username: hyperfleet
+      password: hyperfleet-dev-password
+
+# =============================================================================
+# Validation Adapter - Use RabbitMQ
+# =============================================================================
+validation-gcp:
+  enabled: true
+  deploymentMode: "dummy"
+  broker:
+    type: rabbitmq
+    rabbitmq:
+      url: "amqp://hyperfleet:hyperfleet-dev-password@hyperfleet-rabbitmq:5672/"

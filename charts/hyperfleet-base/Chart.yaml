@@ -1,0 +1,38 @@
+apiVersion: v2
+name: hyperfleet-base
+description: HyperFleet Base Platform - Core components for cluster lifecycle management
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+maintainers:
+  - name: HyperFleet Team
+    email: hyperfleet-team@redhat.com
+
+keywords:
+  - hyperfleet
+  - kubernetes
+  - cluster-management
+  - multi-cloud
+
+home: https://github.com/openshift-hyperfleet/hyperfleet-chart
+
+dependencies:
+  # HyperFleet API - Cluster lifecycle management REST API
+  - name: hyperfleet-api
+    version: "1.0.0"
+    repository: "git+https://github.com/openshift-hyperfleet/hyperfleet-api@charts?ref=main"
+    condition: hyperfleet-api.enabled
+
+  # HyperFleet Sentinel - Resource polling and event publishing
+  - name: sentinel
+    version: "0.1.0"
+    repository: "git+https://github.com/openshift-hyperfleet/hyperfleet-sentinel@deployments/helm/sentinel?ref=main"
+    condition: sentinel.enabled
+
+  # Landing Zone Adapter - Creates cluster namespaces (cloud-agnostic)
+  - name: landing-zone
+    version: "1.0.0"
+    repository: "git+https://github.com/openshift-hyperfleet/adapter-landing-zone@charts?ref=main"
+    alias: adapter-landing-zone
+    condition: adapter-landing-zone.enabled
