@@ -2,9 +2,13 @@
 #
 # This chart deploys HyperFleet on Google Cloud Platform with:
 # - Base platform (API, Sentinel, Landing Zone) from hyperfleet-base
-# - GCP-specific validation adapter
+# - GCP-specific validation adapter(s)
 # - Google Pub/Sub as default broker
 # - Workload Identity support
+#
+# For multi-topic deployments (clusters + nodepools), enable:
+# - base.sentinel-nodepools
+# - validation-gcp-nodepools
 #
 # Usage:
 #   helm install hyperfleet . \
@@ -41,7 +45,7 @@ base:
   hyperfleet-api:
     enabled: true
 
-  # Sentinel configuration with GCP defaults
+  # Sentinel configuration for CLUSTERS topic
   sentinel:
     enabled: true
     serviceAccount:
@@ -50,7 +54,20 @@ base:
       # Set for Workload Identity:
       # iam.gke.io/gcp-service-account: sentinel@PROJECT.iam.gserviceaccount.com
     broker:
-      topic: ""  # Set your topic name
+      topic: ""  # Set your clusters topic name
+      googlepubsub:
+        projectId: ""
+
+  # Sentinel configuration for NODEPOOLS topic (optional)
+  sentinel-nodepools:
+    enabled: false  # Enable for multi-topic deployments
+    serviceAccount:
+      create: true
+      annotations: {}
+      # Set for Workload Identity (uses same GCP SA as clusters sentinel):
+      # iam.gke.io/gcp-service-account: sentinel@PROJECT.iam.gserviceaccount.com
+    broker:
+      topic: ""  # Set your nodepools topic name
       googlepubsub:
         projectId: ""
 
@@ -74,7 +91,7 @@ base:
     enabled: false
 
 # =============================================================================
-# GCP Validation Adapter Configuration
+# GCP Validation Adapter Configuration (Clusters)
 # =============================================================================
 validation-gcp:
   enabled: true
@@ -92,6 +109,33 @@ validation-gcp:
     # iam.gke.io/gcp-service-account: validation-gcp@PROJECT.iam.gserviceaccount.com
   # hyperfleetApi - inherits from base.global.hyperfleetApi
   # broker.type - inherits from base.global.broker.type
+  broker:
+    googlepubsub:
+      projectId: ""
+      topic: ""
+      subscription: ""
+      deadLetterTopic: ""
+    subscriber:
+      parallelism: 1
+
+# =============================================================================
+# GCP Validation Adapter Configuration (Nodepools) - Optional
+# =============================================================================
+# Deploy a second validation adapter for nodepools topic.
+# Both adapters share the same GCP service account (for Pub/Sub subscribing).
+validation-gcp-nodepools:
+  enabled: false  # Enable for multi-topic deployments
+  replicaCount: 1
+  deploymentMode: "dummy"
+  image:
+    registry: quay.io/openshift-hyperfleet
+    repository: hyperfleet-adapter
+    tag: ""
+  serviceAccount:
+    create: true
+    annotations: {}
+    # Set for Workload Identity (uses same GCP SA as clusters validation):
+    # iam.gke.io/gcp-service-account: validation-gcp@PROJECT.iam.gserviceaccount.com
   broker:
     googlepubsub:
       projectId: ""

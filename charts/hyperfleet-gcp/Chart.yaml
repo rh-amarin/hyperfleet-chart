@@ -26,8 +26,15 @@ dependencies:
     repository: "file://../hyperfleet-base"
     alias: base
 
-  # GCP-specific validation adapter
+  # GCP-specific validation adapter for clusters
   - name: validation-gcp
     version: "1.0.0"
     repository: "git+https://github.com/openshift-hyperfleet/adapter-validation-gcp@charts?ref=main"
     condition: validation-gcp.enabled
+
+  # Additional validation adapter for nodepools (optional)
+  - name: validation-gcp
+    version: "1.0.0"
+    repository: "git+https://github.com/openshift-hyperfleet/adapter-validation-gcp@charts?ref=main"
+    alias: validation-gcp-nodepools
+    condition: validation-gcp-nodepools.enabled

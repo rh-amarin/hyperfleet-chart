@@ -25,10 +25,18 @@ dependencies:
     condition: hyperfleet-api.enabled
 
   # HyperFleet Sentinel - Resource polling and event publishing
+  # Default sentinel instance (typically for clusters)
   - name: sentinel
     version: "0.1.0"
     repository: "git+https://github.com/openshift-hyperfleet/hyperfleet-sentinel@deployments/helm/sentinel?ref=main"
     condition: sentinel.enabled
+
+  # Additional sentinel for nodepools (optional)
+  - name: sentinel
+    version: "0.1.0"
+    repository: "git+https://github.com/openshift-hyperfleet/hyperfleet-sentinel@deployments/helm/sentinel?ref=main"
+    alias: sentinel-nodepools
+    condition: sentinel-nodepools.enabled
 
   # Landing Zone Adapter - Creates cluster namespaces (cloud-agnostic)
   - name: landing-zone
