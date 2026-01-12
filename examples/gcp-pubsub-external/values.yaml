@@ -1,0 +1,128 @@
+# HyperFleet GCP + Pub/Sub with External API Access
+#
+# This example extends gcp-pubsub with external API access via LoadBalancer.
+#
+# Prerequisites:
+# 1. GKE cluster with Workload Identity enabled
+# 2. Pub/Sub topics and subscriptions created (use hyperfleet-infra terraform)
+# 3. Terraform applied with enable_external_api=true for firewall rules
+#
+# Usage:
+#   cd charts/hyperfleet-gcp
+#   helm dependency update
+#   helm install hyperfleet . -f ../../examples/gcp-pubsub-external/values.yaml \
+#     -n hyperfleet-system --create-namespace
+#
+# Get external IP after deployment:
+#   kubectl get svc -n hyperfleet-system hyperfleet-hyperfleet-api \
+#     -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+#
+# Replace all <PLACEHOLDER> values with your actual configuration.
+
+base:
+  global:
+    image:
+      registry: "<YOUR_REGISTRY>"  # e.g., "quay.io/your-org"
+
+    hyperfleetApi:
+      baseUrl: "http://hyperfleet-hyperfleet-api:8000"
+      version: "v1"
+
+    broker:
+      type: googlepubsub
+      googlepubsub:
+        enabled: true
+        projectId: "<GCP_PROJECT_ID>"
+      rabbitmq:
+        enabled: false
+
+  hyperfleet-api:
+    enabled: true
+    image:
+      registry: "<YOUR_REGISTRY>"
+      repository: hyperfleet-api
+      tag: "<API_IMAGE_TAG>"
+    # External access via LoadBalancer
+    service:
+      type: LoadBalancer
+      # Optional: Restrict access to specific IPs for security
+      # loadBalancerSourceRanges:
+      #   - "<YOUR_IP>/32"
+      #   - "<OFFICE_IP_RANGE>/24"
+    database:
+      postgresql:
+        enabled: true
+        password: "<DB_PASSWORD>"
+
+  sentinel:
+    enabled: true
+    image:
+      registry: "<YOUR_REGISTRY>"
+      repository: sentinel
+      tag: "<SENTINEL_IMAGE_TAG>"
+    serviceAccount:
+      create: true
+      name: sentinel
+      annotations:
+        iam.gke.io/gcp-service-account: "<SENTINEL_GCP_SA>"
+    config:
+      resourceType: clusters
+      pollInterval: 5s
+    broker:
+      type: googlepubsub
+      topic: "<CLUSTERS_TOPIC>"
+      googlepubsub:
+        projectId: "<GCP_PROJECT_ID>"
+
+  adapter-landing-zone:
+    enabled: true
+    image:
+      registry: "<YOUR_REGISTRY>"
+      repository: hyperfleet-adapter
+      tag: "<ADAPTER_IMAGE_TAG>"
+    serviceAccount:
+      create: true
+      name: landing-zone-adapter
+      annotations:
+        iam.gke.io/gcp-service-account: "<LANDING_ZONE_GCP_SA>"
+    hyperfleetApi:
+      baseUrl: "http://hyperfleet-hyperfleet-api:8000"
+      version: "v1"
+    broker:
+      type: googlepubsub
+      googlepubsub:
+        projectId: "<GCP_PROJECT_ID>"
+        topic: "<CLUSTERS_TOPIC>"
+        subscription: "<LANDING_ZONE_SUBSCRIPTION>"
+        deadLetterTopic: "<CLUSTERS_DLQ_TOPIC>"
+      subscriber:
+        parallelism: 1
+
+  rabbitmq:
+    enabled: false
+
+validation-gcp:
+  enabled: true
+  replicaCount: 1
+  deploymentMode: "dummy"
+  image:
+    registry: "<YOUR_REGISTRY>"
+    repository: hyperfleet-adapter
+    tag: "<ADAPTER_IMAGE_TAG>"
+  serviceAccount:
+    create: true
+    name: validation-gcp-adapter
+    annotations:
+      iam.gke.io/gcp-service-account: "<VALIDATION_GCP_SA>"
+  hyperfleetApi:
+    baseUrl: "http://hyperfleet-hyperfleet-api:8000"
+    version: "v1"
+  broker:
+    type: googlepubsub
+    googlepubsub:
+      projectId: "<GCP_PROJECT_ID>"
+      topic: "<CLUSTERS_TOPIC>"
+      subscription: "<VALIDATION_GCP_SUBSCRIPTION>"
+      deadLetterTopic: "<CLUSTERS_DLQ_TOPIC>"
+    subscriber:
+      parallelism: 1
