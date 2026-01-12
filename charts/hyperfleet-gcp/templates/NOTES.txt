@@ -25,41 +25,18 @@ Broker Configuration:
 
 {{- if eq .Values.base.global.broker.type "googlepubsub" }}
 
-Workload Identity Setup:
-  Ensure your Kubernetes Service Accounts are bound to GCP Service Accounts:
+Workload Identity Federation:
+  IAM permissions are granted directly to Kubernetes service accounts via terraform.
+  No GCP service accounts or annotations needed.
 
-  # Sentinel (clusters)
-  gcloud iam service-accounts add-iam-policy-binding \
-    sentinel@PROJECT.iam.gserviceaccount.com \
-    --role roles/iam.workloadIdentityUser \
-    --member "serviceAccount:PROJECT.svc.id.goog[{{ .Release.Namespace }}/sentinel]"
+  If you see permission errors, verify:
+  1. Terraform was applied with the correct namespace ({{ .Release.Namespace }})
+  2. Service account names match terraform configuration:
+     - sentinel
+     - landing-zone-adapter
+     - validation-gcp-adapter
 {{- if index .Values "base" "sentinel-nodepools" "enabled" }}
-
-  # Sentinel (nodepools) - uses same GCP SA
-  gcloud iam service-accounts add-iam-policy-binding \
-    sentinel@PROJECT.iam.gserviceaccount.com \
-    --role roles/iam.workloadIdentityUser \
-    --member "serviceAccount:PROJECT.svc.id.goog[{{ .Release.Namespace }}/sentinel-nodepools]"
-{{- end }}
-
-  # Landing Zone
-  gcloud iam service-accounts add-iam-policy-binding \
-    landing-zone@PROJECT.iam.gserviceaccount.com \
-    --role roles/iam.workloadIdentityUser \
-    --member "serviceAccount:PROJECT.svc.id.goog[{{ .Release.Namespace }}/landing-zone-adapter]"
-
-  # Validation GCP (clusters)
-  gcloud iam service-accounts add-iam-policy-binding \
-    validation-gcp@PROJECT.iam.gserviceaccount.com \
-    --role roles/iam.workloadIdentityUser \
-    --member "serviceAccount:PROJECT.svc.id.goog[{{ .Release.Namespace }}/validation-gcp-adapter]"
-{{- if index .Values "validation-gcp-nodepools" "enabled" }}
-
-  # Validation GCP (nodepools) - uses same GCP SA
-  gcloud iam service-accounts add-iam-policy-binding \
-    validation-gcp@PROJECT.iam.gserviceaccount.com \
-    --role roles/iam.workloadIdentityUser \
-    --member "serviceAccount:PROJECT.svc.id.goog[{{ .Release.Namespace }}/validation-gcp-nodepools-adapter]"
+     - sentinel-nodepools (or reuse sentinel SA)
 {{- end }}
 {{- end }}
 

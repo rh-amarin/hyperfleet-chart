@@ -32,5 +32,5 @@ To view Sentinel logs:
   kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=sentinel
 
 For production deployments, use a cloud-specific overlay chart:
-  - hyperfleet-gcp: For Google Cloud Platform (Pub/Sub, Workload Identity)
+  - hyperfleet-gcp: For Google Cloud Platform (Pub/Sub, Workload Identity Federation)
   - hyperfleet-aws: For Amazon Web Services (SNS/SQS, IRSA) - coming soon

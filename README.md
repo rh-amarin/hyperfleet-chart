@@ -201,57 +201,42 @@ base:
 
 For production with external RabbitMQ, set `global.broker.type: rabbitmq` but keep `rabbitmq.enabled: false` and configure the URL in each component's `broker.rabbitmq.url`.
 
-### Workload Identity (GCP)
+### Workload Identity Federation (GCP)
 
-For Pub/Sub access, configure Workload Identity for each component:
+HyperFleet uses Workload Identity Federation (WIF) for Pub/Sub access. With WIF, IAM permissions are granted directly to Kubernetes service accounts - no GCP service accounts or annotations needed.
+
+**Terraform handles all WIF configuration automatically.** When you run `terraform apply`, it:
+1. Creates Pub/Sub topics and subscriptions
+2. Grants IAM permissions directly to K8s service accounts via WIF principals
+3. Outputs the helm values snippet with correct topic/subscription names
+
+**No annotations required in Helm values:**
 
 ```yaml
 base:
-  # Sentinel (clusters)
   sentinel:
     serviceAccount:
-      annotations:
-        iam.gke.io/gcp-service-account: sentinel@PROJECT.iam.gserviceaccount.com
-
-  # Sentinel (nodepools) - uses same GCP SA
-  sentinel-nodepools:
-    serviceAccount:
-      annotations:
-        iam.gke.io/gcp-service-account: sentinel@PROJECT.iam.gserviceaccount.com
+      create: true
+      name: sentinel
+      # No annotations needed - WIF grants permissions directly
 
   adapter-landing-zone:
     serviceAccount:
-      annotations:
-        iam.gke.io/gcp-service-account: landing-zone@PROJECT.iam.gserviceaccount.com
+      create: true
+      name: landing-zone-adapter
+      # No annotations needed - WIF grants permissions directly
 
-# Validation adapter (clusters)
 validation-gcp:
   serviceAccount:
-    annotations:
-      iam.gke.io/gcp-service-account: validation-gcp@PROJECT.iam.gserviceaccount.com
-
-# Validation adapter (nodepools) - uses same GCP SA
-validation-gcp-nodepools:
-  serviceAccount:
-    annotations:
-      iam.gke.io/gcp-service-account: validation-gcp@PROJECT.iam.gserviceaccount.com
+    create: true
+    name: validation-gcp-adapter
+    # No annotations needed - WIF grants permissions directly
 ```
 
-**Important:** When using multi-topic deployment, you need to add Workload Identity bindings for the additional Kubernetes ServiceAccounts:
-
-```bash
-# Sentinel nodepools KSA -> Sentinel GSA
-gcloud iam service-accounts add-iam-policy-binding \
-  sentinel@PROJECT.iam.gserviceaccount.com \
-  --role roles/iam.workloadIdentityUser \
-  --member "serviceAccount:PROJECT.svc.id.goog[hyperfleet-system/sentinel-nodepools]"
-
-# Validation nodepools KSA -> Validation GSA
-gcloud iam service-accounts add-iam-policy-binding \
-  validation-gcp@PROJECT.iam.gserviceaccount.com \
-  --role roles/iam.workloadIdentityUser \
-  --member "serviceAccount:PROJECT.svc.id.goog[hyperfleet-system/validation-gcp-nodepools-adapter]"
-```
+**How WIF works:**
+- Terraform creates IAM bindings like: `principal://iam.googleapis.com/projects/PROJECT_NUM/locations/global/workloadIdentityPools/PROJECT_ID.svc.id.goog/subject/ns/NAMESPACE/sa/SA_NAME`
+- GKE automatically maps the K8s service account to this principal
+- No intermediate GCP service accounts are created
 
 ## Chart Dependencies
 
@@ -318,18 +303,20 @@ kubectl port-forward -n hyperfleet-system svc/hyperfleet-rabbitmq 15672:15672
 # Open http://localhost:15672 (hyperfleet / hyperfleet-dev-password)
 ```
 
-### Workload Identity Issues
+### Workload Identity Federation Issues
 
 If pods fail with "Permission denied" or "Unable to generate access token":
 
-1. Verify the KSA annotation matches the GSA email
-2. Ensure the Workload Identity binding exists:
+1. Verify terraform was applied with the correct namespace:
    ```bash
-   gcloud iam service-accounts get-iam-policy GSA@PROJECT.iam.gserviceaccount.com
+   terraform output helm_values_snippet
    ```
-3. For multi-topic deployments, ensure bindings exist for both:
-   - `sentinel` and `sentinel-nodepools` KSAs
-   - `validation-gcp-adapter` and `validation-gcp-nodepools-adapter` KSAs
+2. Check the WIF IAM bindings exist:
+   ```bash
+   gcloud pubsub topics get-iam-policy projects/PROJECT/topics/TOPIC_NAME
+   ```
+3. Ensure the K8s service account name in Helm values matches what terraform expects
+4. Verify the pod is running in the correct namespace (must match terraform's `kubernetes_namespace`)
 
 ## Migration from Legacy Chart
 

@@ -9,7 +9,7 @@
 # Prerequisites:
 # 1. GKE cluster with Workload Identity enabled
 # 2. Pub/Sub topics and subscriptions created (use hyperfleet-infra terraform)
-# 3. GCP service accounts with appropriate IAM bindings
+# 3. WIF IAM bindings configured (handled by Terraform)
 #
 # Usage:
 #   cd charts/hyperfleet-gcp
@@ -18,8 +18,8 @@
 #     -n hyperfleet-system --create-namespace
 #
 # Replace all <PLACEHOLDER> values with your actual configuration.
-# You can generate these values from terraform output:
-#   terraform output -json pubsub_config
+# Get topic/subscription names from terraform output:
+#   terraform output helm_values_snippet
 
 base:
   global:
@@ -63,14 +63,13 @@ base:
     serviceAccount:
       create: true
       name: sentinel
-      annotations:
-        iam.gke.io/gcp-service-account: "<SENTINEL_GCP_SA>"  # e.g., sentinel@project.iam.gserviceaccount.com
+      # No annotations needed - WIF grants permissions directly to K8s SA
     config:
       resourceType: clusters
       pollInterval: 5s
     broker:
       type: googlepubsub
-      topic: "<CLUSTERS_TOPIC>"  # e.g., "hyperfleet-system-clusters"
+      topic: "<CLUSTERS_TOPIC>"  # From terraform output
       googlepubsub:
         projectId: "<GCP_PROJECT_ID>"
 
@@ -87,15 +86,13 @@ base:
     serviceAccount:
       create: true
       name: sentinel-nodepools
-      annotations:
-        # Same GCP SA - has publish access to all topics
-        iam.gke.io/gcp-service-account: "<SENTINEL_GCP_SA>"
+      # No annotations needed - WIF grants permissions directly to K8s SA
     config:
       resourceType: nodepools
       pollInterval: 5s
     broker:
       type: googlepubsub
-      topic: "<NODEPOOLS_TOPIC>"  # e.g., "hyperfleet-system-nodepools"
+      topic: "<NODEPOOLS_TOPIC>"  # From terraform output
       googlepubsub:
         projectId: "<GCP_PROJECT_ID>"
 
@@ -112,8 +109,7 @@ base:
     serviceAccount:
       create: true
       name: landing-zone-adapter
-      annotations:
-        iam.gke.io/gcp-service-account: "<LANDING_ZONE_GCP_SA>"
+      # No annotations needed - WIF grants permissions directly to K8s SA
     hyperfleetApi:
       baseUrl: "http://hyperfleet-hyperfleet-api:8000"
       version: "v1"
@@ -121,9 +117,9 @@ base:
       type: googlepubsub
       googlepubsub:
         projectId: "<GCP_PROJECT_ID>"
-        topic: "<CLUSTERS_TOPIC>"
-        subscription: "<LANDING_ZONE_SUBSCRIPTION>"  # e.g., "hyperfleet-system-clusters-landing-zone-adapter"
-        deadLetterTopic: "<CLUSTERS_DLQ_TOPIC>"
+        topic: "<CLUSTERS_TOPIC>"  # From terraform output
+        subscription: "<LANDING_ZONE_SUBSCRIPTION>"  # From terraform output
+        deadLetterTopic: "<CLUSTERS_DLQ_TOPIC>"  # From terraform output
       subscriber:
         parallelism: 1
 
@@ -144,8 +140,7 @@ validation-gcp:
   serviceAccount:
     create: true
     name: validation-gcp-adapter
-    annotations:
-      iam.gke.io/gcp-service-account: "<VALIDATION_GCP_SA>"
+    # No annotations needed - WIF grants permissions directly to K8s SA
   hyperfleetApi:
     baseUrl: "http://hyperfleet-hyperfleet-api:8000"
     version: "v1"
@@ -153,9 +148,9 @@ validation-gcp:
     type: googlepubsub
     googlepubsub:
       projectId: "<GCP_PROJECT_ID>"
-      topic: "<CLUSTERS_TOPIC>"
-      subscription: "<VALIDATION_GCP_CLUSTERS_SUBSCRIPTION>"
-      deadLetterTopic: "<CLUSTERS_DLQ_TOPIC>"
+      topic: "<CLUSTERS_TOPIC>"  # From terraform output
+      subscription: "<VALIDATION_GCP_CLUSTERS_SUBSCRIPTION>"  # From terraform output
+      deadLetterTopic: "<CLUSTERS_DLQ_TOPIC>"  # From terraform output
     subscriber:
       parallelism: 1
 
@@ -173,9 +168,7 @@ validation-gcp-nodepools:
   serviceAccount:
     create: true
     name: validation-gcp-nodepools-adapter
-    annotations:
-      # Same GCP SA - has subscribe access to all its subscriptions
-      iam.gke.io/gcp-service-account: "<VALIDATION_GCP_SA>"
+    # No annotations needed - WIF grants permissions directly to K8s SA
   hyperfleetApi:
     baseUrl: "http://hyperfleet-hyperfleet-api:8000"
     version: "v1"
@@ -183,8 +176,8 @@ validation-gcp-nodepools:
     type: googlepubsub
     googlepubsub:
       projectId: "<GCP_PROJECT_ID>"
-      topic: "<NODEPOOLS_TOPIC>"
-      subscription: "<VALIDATION_GCP_NODEPOOLS_SUBSCRIPTION>"
-      deadLetterTopic: "<NODEPOOLS_DLQ_TOPIC>"
+      topic: "<NODEPOOLS_TOPIC>"  # From terraform output
+      subscription: "<VALIDATION_GCP_NODEPOOLS_SUBSCRIPTION>"  # From terraform output
+      deadLetterTopic: "<NODEPOOLS_DLQ_TOPIC>"  # From terraform output
     subscriber:
       parallelism: 1
