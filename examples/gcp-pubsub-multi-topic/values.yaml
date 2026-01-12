@@ -132,7 +132,11 @@ base:
 validation-gcp:
   enabled: true
   replicaCount: 1
-  deploymentMode: "dummy"  # Use "real" when validation-gcp-adapter.yaml exists
+  # NOTE: deploymentMode controls validation behavior:
+  #   - "dummy": Returns mock validation responses (for examples/testing)
+  #   - "real": Performs actual GCP validation (requires validation logic implementation)
+  # Use "dummy" until the validation-gcp adapter has real GCP validation logic.
+  deploymentMode: "dummy"
   image:
     registry: "<YOUR_REGISTRY>"
     repository: hyperfleet-adapter
@@ -160,6 +164,10 @@ validation-gcp:
 validation-gcp-nodepools:
   enabled: true
   replicaCount: 1
+  # NOTE: deploymentMode controls validation behavior:
+  #   - "dummy": Returns mock validation responses (for examples/testing)
+  #   - "real": Performs actual GCP validation (requires validation logic implementation)
+  # Use "dummy" until the validation-gcp adapter has real GCP validation logic.
   deploymentMode: "dummy"
   image:
     registry: "<YOUR_REGISTRY>"
