@@ -2,9 +2,15 @@ HyperFleet for Google Cloud Platform has been deployed!
 
 Components:
   - HyperFleet API: Cluster lifecycle management
-  - Sentinel: Resource polling and event publishing
+  - Sentinel (clusters): Resource polling and event publishing
+{{- if index .Values "base" "sentinel-nodepools" "enabled" }}
+  - Sentinel (nodepools): Nodepool resource polling and event publishing
+{{- end }}
   - Landing Zone Adapter: Namespace creation
-  - Validation GCP Adapter: GCP cluster validation
+  - Validation GCP Adapter (clusters): GCP cluster validation
+{{- if index .Values "validation-gcp-nodepools" "enabled" }}
+  - Validation GCP Adapter (nodepools): GCP nodepool validation
+{{- end }}
 {{- if .Values.base.rabbitmq.enabled }}
   - RabbitMQ: In-cluster message broker (development mode)
 {{- end }}
@@ -19,26 +25,19 @@ Broker Configuration:
 
 {{- if eq .Values.base.global.broker.type "googlepubsub" }}
 
-Workload Identity Setup:
-  Ensure your Kubernetes Service Accounts are bound to GCP Service Accounts:
+Workload Identity Federation:
+  IAM permissions are granted directly to Kubernetes service accounts via terraform.
+  No GCP service accounts or annotations needed.
 
-  # Sentinel
-  gcloud iam service-accounts add-iam-policy-binding \
-    sentinel@PROJECT.iam.gserviceaccount.com \
-    --role roles/iam.workloadIdentityUser \
-    --member "serviceAccount:PROJECT.svc.id.goog[{{ .Release.Namespace }}/sentinel]"
-
-  # Landing Zone
-  gcloud iam service-accounts add-iam-policy-binding \
-    landing-zone@PROJECT.iam.gserviceaccount.com \
-    --role roles/iam.workloadIdentityUser \
-    --member "serviceAccount:PROJECT.svc.id.goog[{{ .Release.Namespace }}/landing-zone-adapter]"
-
-  # Validation GCP
-  gcloud iam service-accounts add-iam-policy-binding \
-    validation-gcp@PROJECT.iam.gserviceaccount.com \
-    --role roles/iam.workloadIdentityUser \
-    --member "serviceAccount:PROJECT.svc.id.goog[{{ .Release.Namespace }}/validation-gcp-adapter]"
+  If you see permission errors, verify:
+  1. Terraform was applied with the correct namespace ({{ .Release.Namespace }})
+  2. Service account names match terraform configuration:
+     - sentinel
+     - landing-zone-adapter
+     - validation-gcp-adapter
+{{- if index .Values "base" "sentinel-nodepools" "enabled" }}
+     - sentinel-nodepools (or reuse sentinel SA)
+{{- end }}
 {{- end }}
 
 To check the status:
@@ -47,5 +46,11 @@ To check the status:
 To view logs:
   kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=hyperfleet-api
   kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=sentinel
-  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=landing-zone
+{{- if index .Values "base" "sentinel-nodepools" "enabled" }}
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=sentinel-nodepools
+{{- end }}
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=adapter-landing-zone
   kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=validation-gcp
+{{- if index .Values "validation-gcp-nodepools" "enabled" }}
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=validation-gcp-nodepools
+{{- end }}

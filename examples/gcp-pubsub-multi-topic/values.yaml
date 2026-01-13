@@ -1,0 +1,191 @@
+# HyperFleet GCP + Pub/Sub Multi-Topic Deployment Example
+#
+# This example deploys the full HyperFleet stack with multi-topic support:
+# - HyperFleet API
+# - Sentinel (clusters) + Sentinel (nodepools)
+# - Landing Zone Adapter (clusters)
+# - Validation-GCP Adapter (clusters) + Validation-GCP Adapter (nodepools)
+#
+# Prerequisites:
+# 1. GKE cluster with Workload Identity enabled
+# 2. Pub/Sub topics and subscriptions created (use hyperfleet-infra terraform)
+# 3. WIF IAM bindings configured (handled by Terraform)
+#
+# Usage:
+#   cd charts/hyperfleet-gcp
+#   helm dependency update
+#   helm install hyperfleet . -f ../../examples/gcp-pubsub-multi-topic/values.yaml \
+#     -n hyperfleet-system --create-namespace
+#
+# Replace all <PLACEHOLDER> values with your actual configuration.
+# Get topic/subscription names from terraform output:
+#   terraform output helm_values_snippet
+
+base:
+  global:
+    image:
+      registry: "<YOUR_REGISTRY>"  # e.g., "quay.io/your-org"
+
+    hyperfleetApi:
+      baseUrl: "http://hyperfleet-hyperfleet-api:8000"
+      version: "v1"
+
+    broker:
+      type: googlepubsub
+      googlepubsub:
+        enabled: true
+        projectId: "<GCP_PROJECT_ID>"
+      rabbitmq:
+        enabled: false
+
+  hyperfleet-api:
+    enabled: true
+    replicaCount: 1
+    image:
+      registry: "<YOUR_REGISTRY>"
+      repository: hyperfleet-api
+      tag: "<API_IMAGE_TAG>"  # e.g., "v1.0.0" or "dev-abc1234"
+    database:
+      postgresql:
+        enabled: true
+        password: "<DB_PASSWORD>"  # Change in production!
+
+  # ==========================================================================
+  # Sentinel for CLUSTERS topic
+  # ==========================================================================
+  sentinel:
+    enabled: true
+    replicaCount: 1
+    image:
+      registry: "<YOUR_REGISTRY>"
+      repository: sentinel
+      tag: "<SENTINEL_IMAGE_TAG>"
+    serviceAccount:
+      create: true
+      name: sentinel
+      # No annotations needed - WIF grants permissions directly to K8s SA
+    config:
+      resourceType: clusters
+      pollInterval: 5s
+    broker:
+      type: googlepubsub
+      topic: "<CLUSTERS_TOPIC>"  # From terraform output
+      googlepubsub:
+        projectId: "<GCP_PROJECT_ID>"
+
+  # ==========================================================================
+  # Sentinel for NODEPOOLS topic
+  # ==========================================================================
+  sentinel-nodepools:
+    enabled: true
+    replicaCount: 1
+    image:
+      registry: "<YOUR_REGISTRY>"
+      repository: sentinel
+      tag: "<SENTINEL_IMAGE_TAG>"
+    serviceAccount:
+      create: true
+      name: sentinel-nodepools
+      # No annotations needed - WIF grants permissions directly to K8s SA
+    config:
+      resourceType: nodepools
+      pollInterval: 5s
+    broker:
+      type: googlepubsub
+      topic: "<NODEPOOLS_TOPIC>"  # From terraform output
+      googlepubsub:
+        projectId: "<GCP_PROJECT_ID>"
+
+  # ==========================================================================
+  # Landing Zone Adapter (clusters only)
+  # ==========================================================================
+  adapter-landing-zone:
+    enabled: true
+    replicaCount: 1
+    image:
+      registry: "<YOUR_REGISTRY>"
+      repository: hyperfleet-adapter
+      tag: "<ADAPTER_IMAGE_TAG>"
+    serviceAccount:
+      create: true
+      name: landing-zone-adapter
+      # No annotations needed - WIF grants permissions directly to K8s SA
+    hyperfleetApi:
+      baseUrl: "http://hyperfleet-hyperfleet-api:8000"
+      version: "v1"
+    broker:
+      type: googlepubsub
+      googlepubsub:
+        projectId: "<GCP_PROJECT_ID>"
+        topic: "<CLUSTERS_TOPIC>"  # From terraform output
+        subscription: "<LANDING_ZONE_SUBSCRIPTION>"  # From terraform output
+        deadLetterTopic: "<CLUSTERS_DLQ_TOPIC>"  # From terraform output
+      subscriber:
+        parallelism: 1
+
+  rabbitmq:
+    enabled: false
+
+# =============================================================================
+# Validation-GCP Adapter for CLUSTERS topic
+# =============================================================================
+validation-gcp:
+  enabled: true
+  replicaCount: 1
+  # NOTE: deploymentMode controls validation behavior:
+  #   - "dummy": Returns mock validation responses (for examples/testing)
+  #   - "real": Performs actual GCP validation (requires validation logic implementation)
+  # Use "dummy" until the validation-gcp adapter has real GCP validation logic.
+  deploymentMode: "dummy"
+  image:
+    registry: "<YOUR_REGISTRY>"
+    repository: hyperfleet-adapter
+    tag: "<ADAPTER_IMAGE_TAG>"
+  serviceAccount:
+    create: true
+    name: validation-gcp-adapter
+    # No annotations needed - WIF grants permissions directly to K8s SA
+  hyperfleetApi:
+    baseUrl: "http://hyperfleet-hyperfleet-api:8000"
+    version: "v1"
+  broker:
+    type: googlepubsub
+    googlepubsub:
+      projectId: "<GCP_PROJECT_ID>"
+      topic: "<CLUSTERS_TOPIC>"  # From terraform output
+      subscription: "<VALIDATION_GCP_CLUSTERS_SUBSCRIPTION>"  # From terraform output
+      deadLetterTopic: "<CLUSTERS_DLQ_TOPIC>"  # From terraform output
+    subscriber:
+      parallelism: 1
+
+# =============================================================================
+# Validation-GCP Adapter for NODEPOOLS topic
+# =============================================================================
+validation-gcp-nodepools:
+  enabled: true
+  replicaCount: 1
+  # NOTE: deploymentMode controls validation behavior:
+  #   - "dummy": Returns mock validation responses (for examples/testing)
+  #   - "real": Performs actual GCP validation (requires validation logic implementation)
+  # Use "dummy" until the validation-gcp adapter has real GCP validation logic.
+  deploymentMode: "dummy"
+  image:
+    registry: "<YOUR_REGISTRY>"
+    repository: hyperfleet-adapter
+    tag: "<ADAPTER_IMAGE_TAG>"
+  serviceAccount:
+    create: true
+    name: validation-gcp-nodepools-adapter
+    # No annotations needed - WIF grants permissions directly to K8s SA
+  hyperfleetApi:
+    baseUrl: "http://hyperfleet-hyperfleet-api:8000"
+    version: "v1"
+  broker:
+    type: googlepubsub
+    googlepubsub:
+      projectId: "<GCP_PROJECT_ID>"
+      topic: "<NODEPOOLS_TOPIC>"  # From terraform output
+      subscription: "<VALIDATION_GCP_NODEPOOLS_SUBSCRIPTION>"  # From terraform output
+      deadLetterTopic: "<NODEPOOLS_DLQ_TOPIC>"  # From terraform output
+    subscriber:
+      parallelism: 1

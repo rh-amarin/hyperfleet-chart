@@ -13,23 +13,52 @@ hyperfleet-chart/
     hyperfleet-gcp/      # GCP overlay (validation-gcp, Pub/Sub defaults)
   examples/
     gcp-rabbitmq/        # GCP + RabbitMQ for development
-    gcp-pubsub/          # GCP + Pub/Sub for production
+    gcp-pubsub/          # GCP + Pub/Sub for production (single topic)
+    gcp-pubsub-multi-topic/  # GCP + Pub/Sub with clusters + nodepools topics
 ```
 
 ### hyperfleet-base
 
 Core platform components that work on any cloud:
 - **hyperfleet-api** - Cluster lifecycle management REST API
-- **sentinel** - Resource polling and event publishing
+- **sentinel** - Resource polling and event publishing (clusters)
+- **sentinel-nodepools** - Optional second sentinel for nodepools (multi-topic)
 - **adapter-landing-zone** - Adapter that creates cluster namespaces
 - **rabbitmq** - Optional in-cluster broker for development
 
 ### hyperfleet-gcp
 
 GCP-specific overlay that adds:
-- **validation-gcp** - GCP cluster validation adapter
+- **validation-gcp** - GCP cluster validation adapter (clusters topic)
+- **validation-gcp-nodepools** - Optional second validation adapter (nodepools topic)
 - Google Pub/Sub as default broker
 - Workload Identity configuration
+
+## Architecture
+
+### Single Topic (Default)
+
+All resources flow through one topic:
+
+```text
+sentinel (clusters) → clusters-topic → landing-zone-adapter
+                                    → validation-gcp-adapter
+```
+
+### Multi-Topic (Optional)
+
+Separate topics for clusters and nodepools:
+
+```text
+sentinel (clusters)  → clusters-topic  → landing-zone-adapter
+                                       → validation-gcp-adapter (clusters)
+
+sentinel (nodepools) → nodepools-topic → validation-gcp-adapter (nodepools)
+```
+
+Enable multi-topic by setting:
+- `base.sentinel-nodepools.enabled: true`
+- `validation-gcp-nodepools.enabled: true`
 
 ## Prerequisites
 
@@ -52,7 +81,7 @@ helm install hyperfleet . -f values-rabbitmq.yaml \
   -n hyperfleet-system --create-namespace
 ```
 
-### GCP Production (Pub/Sub)
+### GCP Production (Pub/Sub - Single Topic)
 
 ```bash
 cd charts/hyperfleet-gcp
@@ -62,6 +91,20 @@ helm install hyperfleet . \
   --set base.global.broker.googlepubsub.projectId=YOUR_PROJECT \
   -n hyperfleet-system --create-namespace
 ```
+
+### GCP Production (Pub/Sub - Multi-Topic)
+
+For deployments with separate clusters and nodepools topics:
+
+```bash
+cd charts/hyperfleet-gcp
+helm dependency update
+helm install hyperfleet . \
+  -f ../../examples/gcp-pubsub-multi-topic/values.yaml \
+  -n hyperfleet-system --create-namespace
+```
+
+See [examples/gcp-pubsub-multi-topic/values.yaml](examples/gcp-pubsub-multi-topic/values.yaml) for the full configuration template.
 
 ## Using Custom Images
 
@@ -87,6 +130,49 @@ helm install hyperfleet charts/hyperfleet-gcp -f my-values.yaml \
 ```
 
 ## Configuration
+
+### Multi-Topic Deployment
+
+To deploy with separate topics for clusters and nodepools:
+
+```yaml
+base:
+  # Sentinel for clusters (default)
+  sentinel:
+    enabled: true
+    broker:
+      type: googlepubsub
+      topic: "hyperfleet-clusters"
+      googlepubsub:
+        projectId: "your-project"
+
+  # Sentinel for nodepools (optional)
+  sentinel-nodepools:
+    enabled: true  # Enable for multi-topic
+    broker:
+      type: googlepubsub
+      topic: "hyperfleet-nodepools"
+      googlepubsub:
+        projectId: "your-project"
+
+# Validation adapter for clusters (default)
+validation-gcp:
+  enabled: true
+  broker:
+    type: googlepubsub
+    googlepubsub:
+      topic: "hyperfleet-clusters"
+      subscription: "hyperfleet-clusters-validation-gcp"
+
+# Validation adapter for nodepools (optional)
+validation-gcp-nodepools:
+  enabled: true  # Enable for multi-topic
+  broker:
+    type: googlepubsub
+    googlepubsub:
+      topic: "hyperfleet-nodepools"
+      subscription: "hyperfleet-nodepools-validation-gcp"
+```
 
 ### Broker Options
 
@@ -115,27 +201,42 @@ base:
 
 For production with external RabbitMQ, set `global.broker.type: rabbitmq` but keep `rabbitmq.enabled: false` and configure the URL in each component's `broker.rabbitmq.url`.
 
-### Workload Identity (GCP)
+### Workload Identity Federation (GCP)
 
-For Pub/Sub access, configure Workload Identity:
+HyperFleet uses Workload Identity Federation (WIF) for Pub/Sub access. With WIF, IAM permissions are granted directly to Kubernetes service accounts - no GCP service accounts or annotations needed.
+
+**Terraform handles all WIF configuration automatically.** When you run `terraform apply`, it:
+1. Creates Pub/Sub topics and subscriptions
+2. Grants IAM permissions directly to K8s service accounts via WIF principals
+3. Outputs the helm values snippet with correct topic/subscription names
+
+**No annotations required in Helm values:**
 
 ```yaml
 base:
   sentinel:
     serviceAccount:
-      annotations:
-        iam.gke.io/gcp-service-account: sentinel@PROJECT.iam.gserviceaccount.com
+      create: true
+      name: sentinel
+      # No annotations needed - WIF grants permissions directly
 
   adapter-landing-zone:
     serviceAccount:
-      annotations:
-        iam.gke.io/gcp-service-account: landing-zone@PROJECT.iam.gserviceaccount.com
+      create: true
+      name: landing-zone-adapter
+      # No annotations needed - WIF grants permissions directly
 
 validation-gcp:
   serviceAccount:
-    annotations:
-      iam.gke.io/gcp-service-account: validation-gcp@PROJECT.iam.gserviceaccount.com
+    create: true
+    name: validation-gcp-adapter
+    # No annotations needed - WIF grants permissions directly
 ```
+
+**How WIF works:**
+- Terraform creates IAM bindings like: `principal://iam.googleapis.com/projects/PROJECT_NUM/locations/global/workloadIdentityPools/PROJECT_ID.svc.id.goog/subject/ns/NAMESPACE/sa/SA_NAME`
+- GKE automatically maps the K8s service account to this principal
+- No intermediate GCP service accounts are created
 
 ## Chart Dependencies
 
@@ -148,6 +249,9 @@ dependencies:
     repository: "git+https://github.com/openshift-hyperfleet/hyperfleet-api@charts?ref=main"
   - name: sentinel
     repository: "git+https://github.com/openshift-hyperfleet/hyperfleet-sentinel@deployments/helm/sentinel?ref=main"
+  - name: sentinel
+    alias: sentinel-nodepools  # Second sentinel for nodepools
+    condition: sentinel-nodepools.enabled
   - name: adapter-landing-zone
     repository: "git+https://github.com/openshift-hyperfleet/adapter-landing-zone@charts?ref=main"
 
@@ -157,6 +261,9 @@ dependencies:
     repository: "file://../hyperfleet-base"
   - name: validation-gcp
     repository: "git+https://github.com/openshift-hyperfleet/adapter-validation-gcp@charts?ref=main"
+  - name: validation-gcp
+    alias: validation-gcp-nodepools  # Second adapter for nodepools
+    condition: validation-gcp-nodepools.enabled
 ```
 
 ## Examples
@@ -164,7 +271,8 @@ dependencies:
 See [examples/](examples/) for ready-to-use values files:
 
 - [examples/gcp-rabbitmq/values.yaml](examples/gcp-rabbitmq/values.yaml) - GCP with RabbitMQ (development)
-- [examples/gcp-pubsub/values.yaml](examples/gcp-pubsub/values.yaml) - GCP with Pub/Sub (production)
+- [examples/gcp-pubsub/values.yaml](examples/gcp-pubsub/values.yaml) - GCP with Pub/Sub (production, single topic)
+- [examples/gcp-pubsub-multi-topic/values.yaml](examples/gcp-pubsub-multi-topic/values.yaml) - GCP with Pub/Sub (production, multi-topic)
 
 ## Troubleshooting
 
@@ -177,10 +285,15 @@ kubectl get pods -n hyperfleet-system
 ### View Logs
 
 ```bash
+# Core components
 kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=hyperfleet-api
 kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=sentinel
 kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=adapter-landing-zone
 kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=validation-gcp
+
+# Multi-topic components (if enabled)
+kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=sentinel-nodepools
+kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=validation-gcp-nodepools
 ```
 
 ### RabbitMQ Management UI
@@ -189,6 +302,21 @@ kubectl logs -n hyperfleet-system -l app.kubernetes.io/name=validation-gcp
 kubectl port-forward -n hyperfleet-system svc/hyperfleet-rabbitmq 15672:15672
 # Open http://localhost:15672 (hyperfleet / hyperfleet-dev-password)
 ```
+
+### Workload Identity Federation Issues
+
+If pods fail with "Permission denied" or "Unable to generate access token":
+
+1. Verify terraform was applied with the correct namespace:
+   ```bash
+   terraform output helm_values_snippet
+   ```
+2. Check the WIF IAM bindings exist:
+   ```bash
+   gcloud pubsub topics get-iam-policy projects/PROJECT/topics/TOPIC_NAME
+   ```
+3. Ensure the K8s service account name in Helm values matches what terraform expects
+4. Verify the pod is running in the correct namespace (must match terraform's `kubernetes_namespace`)
 
 ## Migration from Legacy Chart
 

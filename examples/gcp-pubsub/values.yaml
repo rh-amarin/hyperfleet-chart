@@ -5,9 +5,8 @@
 #
 # Prerequisites:
 #   1. GKE cluster with Workload Identity enabled
-#   2. GCP service accounts with Pub/Sub roles
-#   3. Workload Identity bindings configured
-#   4. Pub/Sub topics and subscriptions created (via Terraform)
+#   2. Pub/Sub topics and subscriptions created (via Terraform)
+#   3. WIF IAM bindings configured (handled by Terraform)
 #
 # Usage:
 #   cd charts/hyperfleet-gcp
@@ -56,12 +55,11 @@ base:
     serviceAccount:
       create: true
       name: sentinel
-      annotations:
-        iam.gke.io/gcp-service-account: sentinel-USER@YOUR_GCP_PROJECT.iam.gserviceaccount.com
+      # No annotations needed - WIF grants permissions directly to K8s SA
     config:
       resourceSelector: []
     broker:
-      topic: "hyperfleet-system-clusters-USER"
+      topic: "YOUR_CLUSTERS_TOPIC"  # From terraform output
       googlepubsub:
         projectId: "YOUR_GCP_PROJECT"
         maxOutstandingMessages: 1000
@@ -76,14 +74,13 @@ base:
     serviceAccount:
       create: true
       name: landing-zone-adapter
-      annotations:
-        iam.gke.io/gcp-service-account: landing-zone-USER@YOUR_GCP_PROJECT.iam.gserviceaccount.com
+      # No annotations needed - WIF grants permissions directly to K8s SA
     broker:
       googlepubsub:
         projectId: "YOUR_GCP_PROJECT"
-        topic: "hyperfleet-system-clusters-USER"
-        subscription: "hyperfleet-system-clusters-landing-zone-adapter-USER"
-        deadLetterTopic: "hyperfleet-system-clusters-USER-dlq"
+        topic: "YOUR_CLUSTERS_TOPIC"  # From terraform output
+        subscription: "YOUR_LANDING_ZONE_SUBSCRIPTION"  # From terraform output
+        deadLetterTopic: "YOUR_CLUSTERS_DLQ_TOPIC"  # From terraform output
       subscriber:
         parallelism: 1
 
@@ -93,8 +90,10 @@ base:
 validation-gcp:
   enabled: true
   replicaCount: 1
-  # NOTE: "dummy" mode returns mock validation responses. Switch to "real" mode
-  # once the validation-gcp adapter has real GCP validation logic implemented.
+  # NOTE: deploymentMode controls validation behavior:
+  #   - "dummy": Returns mock validation responses (for examples/testing)
+  #   - "real": Performs actual GCP validation (requires validation logic implementation)
+  # Use "dummy" until the validation-gcp adapter has real GCP validation logic.
   # See: https://github.com/openshift-hyperfleet/adapter-validation-gcp
   deploymentMode: "dummy"
   image:
@@ -104,13 +103,12 @@ validation-gcp:
   serviceAccount:
     create: true
     name: validation-gcp-adapter
-    annotations:
-      iam.gke.io/gcp-service-account: validation-gcp-USER@YOUR_GCP_PROJECT.iam.gserviceaccount.com
+    # No annotations needed - WIF grants permissions directly to K8s SA
   broker:
     googlepubsub:
       projectId: "YOUR_GCP_PROJECT"
-      topic: "hyperfleet-system-clusters-USER"
-      subscription: "hyperfleet-system-clusters-validation-gcp-adapter-USER"
-      deadLetterTopic: "hyperfleet-system-clusters-USER-dlq"
+      topic: "YOUR_CLUSTERS_TOPIC"  # From terraform output
+      subscription: "YOUR_VALIDATION_GCP_SUBSCRIPTION"  # From terraform output
+      deadLetterTopic: "YOUR_CLUSTERS_DLQ_TOPIC"  # From terraform output
     subscriber:
       parallelism: 1

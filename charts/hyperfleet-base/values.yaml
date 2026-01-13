@@ -70,7 +70,7 @@ hyperfleet-api:
       secretName: ""
 
 # =============================================================================
-# Sentinel Configuration
+# Sentinel Configuration (Clusters)
 # =============================================================================
 sentinel:
   enabled: true
@@ -91,6 +91,34 @@ sentinel:
     topic: "hyperfleet-clusters"
     rabbitmq:
       url: ""  # Auto-generated if empty
+    googlepubsub:
+      projectId: ""
+      maxOutstandingMessages: 1000
+      numGoroutines: 10
+
+# =============================================================================
+# Sentinel Configuration (Nodepools) - Optional
+# =============================================================================
+# Deploy a second sentinel instance for watching nodepools.
+# Both sentinels share the same GCP service account (for Pub/Sub publishing).
+sentinel-nodepools:
+  enabled: false  # Enable for multi-topic deployments
+  replicaCount: 1
+  image:
+    registry: quay.io/openshift-hyperfleet
+    repository: sentinel
+    tag: ""
+  serviceAccount:
+    create: true
+    annotations: {}
+  config:
+    resourceType: nodepools
+    pollInterval: 5s
+    resourceSelector: []
+  broker:
+    topic: "hyperfleet-nodepools"
+    rabbitmq:
+      url: ""
     googlepubsub:
       projectId: ""
       maxOutstandingMessages: 1000
