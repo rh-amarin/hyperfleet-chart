@@ -37,6 +37,7 @@ base:
     enabled: true
     replicaCount: 1
     image:
+      registry: "quay.io/YOUR_QUAY_USERNAME"
       repository: hyperfleet-api
       tag: "dev-API_GIT_SHA"
     database:
@@ -50,7 +51,7 @@ base:
     replicaCount: 1
     image:
       registry: "quay.io/YOUR_QUAY_USERNAME"
-      repository: sentinel
+      repository: hyperfleet-sentinel
       tag: "dev-SENTINEL_GIT_SHA"
     serviceAccount:
       create: true
@@ -61,21 +62,27 @@ base:
     broker:
       topic: "YOUR_CLUSTERS_TOPIC"  # From terraform output
       googlepubsub:
+        type: googlepubsub
         projectId: "YOUR_GCP_PROJECT"
         maxOutstandingMessages: 1000
         numGoroutines: 10
+    hyperfleetApi:
+      baseUrl: "http://hyperfleet-hyperfleet-api:8000"
+      version: "v1"
 
   adapter-landing-zone:
     enabled: true
     replicaCount: 1
     image:
-      repository: adapter-landing-zone
+      registry: "quay.io/YOUR_QUAY_USERNAME"
+      repository: hyperfleet-adapter
       tag: "dev-ADAPTER_GIT_SHA"
     serviceAccount:
       create: true
       name: landing-zone-adapter
       # No annotations needed - WIF grants permissions directly to K8s SA
     broker:
+      type: googlepubsub
       googlepubsub:
         projectId: "YOUR_GCP_PROJECT"
         topic: "YOUR_CLUSTERS_TOPIC"  # From terraform output
@@ -83,10 +90,9 @@ base:
         deadLetterTopic: "YOUR_CLUSTERS_DLQ_TOPIC"  # From terraform output
       subscriber:
         parallelism: 1
-
-  rabbitmq:
-    enabled: false
-
+    hyperfleetApi:
+      baseUrl: "http://hyperfleet-hyperfleet-api:8000"
+      version: "v1"
 validation-gcp:
   enabled: true
   replicaCount: 1
@@ -98,7 +104,7 @@ validation-gcp:
   deploymentMode: "dummy"
   image:
     registry: "quay.io/YOUR_QUAY_USERNAME"
-    repository: adapter-validation-gcp
+    repository: hyperfleet-adapter
     tag: "dev-ADAPTER_GIT_SHA"
   serviceAccount:
     create: true
@@ -112,3 +118,9 @@ validation-gcp:
       deadLetterTopic: "YOUR_CLUSTERS_DLQ_TOPIC"  # From terraform output
     subscriber:
       parallelism: 1
+  hyperfleetApi:
+    baseUrl: "http://hyperfleet-hyperfleet-api:8000"
+    version: "v1"
+  validation:
+    # Status reporter image (sidecar container)
+    statusReporterImage: "quay.io/YOUR_QUAY_USERNAME/REPOSITORY:TAG"
