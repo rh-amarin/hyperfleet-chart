@@ -59,16 +59,16 @@ base:
       # No annotations needed - WIF grants permissions directly to K8s SA
     config:
       resourceSelector: []
+      hyperfleetApi:
+        baseUrl: "http://hyperfleet-hyperfleet-api:8000"
+        version: "v1"
     broker:
       topic: "YOUR_CLUSTERS_TOPIC"  # From terraform output
+      type: googlepubsub
       googlepubsub:
-        type: googlepubsub
         projectId: "YOUR_GCP_PROJECT"
         maxOutstandingMessages: 1000
         numGoroutines: 10
-    hyperfleetApi:
-      baseUrl: "http://hyperfleet-hyperfleet-api:8000"
-      version: "v1"
 
   adapter-landing-zone:
     enabled: true
@@ -93,6 +93,9 @@ base:
     hyperfleetApi:
       baseUrl: "http://hyperfleet-hyperfleet-api:8000"
       version: "v1"
+    rbac:
+      create: true
+      namespaceAdmin: true
 validation-gcp:
   enabled: true
   replicaCount: 1
