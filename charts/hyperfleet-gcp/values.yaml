@@ -51,8 +51,6 @@ base:
     serviceAccount:
       create: true
       annotations: {}
-      # Set for Workload Identity:
-      # iam.gke.io/gcp-service-account: sentinel@PROJECT.iam.gserviceaccount.com
     broker:
       topic: ""  # Set your clusters topic name
       googlepubsub:
@@ -64,8 +62,6 @@ base:
     serviceAccount:
       create: true
       annotations: {}
-      # Set for Workload Identity (uses same GCP SA as clusters sentinel):
-      # iam.gke.io/gcp-service-account: sentinel@PROJECT.iam.gserviceaccount.com
     broker:
       topic: ""  # Set your nodepools topic name
       googlepubsub:
@@ -77,8 +73,6 @@ base:
     serviceAccount:
       create: true
       annotations: {}
-      # Set for Workload Identity:
-      # iam.gke.io/gcp-service-account: landing-zone@PROJECT.iam.gserviceaccount.com
     broker:
       googlepubsub:
         projectId: ""
@@ -105,8 +99,6 @@ validation-gcp:
   serviceAccount:
     create: true
     annotations: {}
-    # Set for Workload Identity:
-    # iam.gke.io/gcp-service-account: validation-gcp@PROJECT.iam.gserviceaccount.com
   # hyperfleetApi - inherits from base.global.hyperfleetApi
   # broker.type - inherits from base.global.broker.type
   broker:
@@ -134,8 +126,6 @@ validation-gcp-nodepools:
   serviceAccount:
     create: true
     annotations: {}
-    # Set for Workload Identity (uses same GCP SA as clusters validation):
-    # iam.gke.io/gcp-service-account: validation-gcp@PROJECT.iam.gserviceaccount.com
   broker:
     googlepubsub:
       projectId: ""
