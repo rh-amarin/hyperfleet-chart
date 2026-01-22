@@ -131,6 +131,46 @@ helm install hyperfleet charts/hyperfleet-gcp -f my-values.yaml \
 
 ## Configuration
 
+### External API Access
+
+By default, the HyperFleet API is only accessible within the cluster (ClusterIP). For dev environments where external access is needed:
+
+**1. Enable firewall rules in terraform:**
+
+```bash
+cd hyperfleet-infra/terraform
+terraform apply -var="enable_external_api=true"
+```
+
+**2. Deploy with LoadBalancer service type:**
+
+```bash
+helm install hyperfleet charts/hyperfleet-gcp \
+  -f examples/gcp-pubsub-external/values.yaml \
+  -n hyperfleet-system --create-namespace
+```
+
+Or add to your values file:
+
+```yaml
+base:
+  hyperfleet-api:
+    service:
+      type: LoadBalancer
+      # Optional: Restrict to specific IPs
+      # loadBalancerSourceRanges:
+      #   - "YOUR_IP/32"
+```
+
+**3. Get the external IP:**
+
+```bash
+kubectl get svc -n hyperfleet-system hyperfleet-hyperfleet-api \
+  -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+```
+
+**Security Note:** External access is HTTP-only (no TLS). For production, consider using an Ingress controller with TLS termination. Use `loadBalancerSourceRanges` to restrict access to known IPs.
+
 ### Multi-Topic Deployment
 
 To deploy with separate topics for clusters and nodepools:
@@ -273,6 +313,7 @@ See [examples/](examples/) for ready-to-use values files:
 - [examples/gcp-rabbitmq/values.yaml](examples/gcp-rabbitmq/values.yaml) - GCP with RabbitMQ (development)
 - [examples/gcp-pubsub/values.yaml](examples/gcp-pubsub/values.yaml) - GCP with Pub/Sub (production, single topic)
 - [examples/gcp-pubsub-multi-topic/values.yaml](examples/gcp-pubsub-multi-topic/values.yaml) - GCP with Pub/Sub (production, multi-topic)
+- [examples/gcp-pubsub-external/values.yaml](examples/gcp-pubsub-external/values.yaml) - GCP with Pub/Sub + external API access
 
 ## Troubleshooting
 

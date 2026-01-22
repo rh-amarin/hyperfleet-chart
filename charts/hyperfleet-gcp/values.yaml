@@ -44,6 +44,14 @@ base:
   # API configuration
   hyperfleet-api:
     enabled: true
+    # Service type: ClusterIP (internal) or LoadBalancer (external)
+    # For external access, set type: LoadBalancer and ensure terraform
+    # was applied with enable_external_api=true for firewall rules
+    service:
+      type: ClusterIP
+      # Optionally restrict LoadBalancer access to specific IPs:
+      # loadBalancerSourceRanges:
+      #   - "YOUR_IP/32"
 
   # Sentinel configuration for CLUSTERS topic
   sentinel:
